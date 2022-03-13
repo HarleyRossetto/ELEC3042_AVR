@@ -1,0 +1,5 @@
+*.elf
+*.asm
+*.bin
+*.hex
+build/CMake/**
