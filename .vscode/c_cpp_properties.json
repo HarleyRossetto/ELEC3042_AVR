@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "name": "avr",
+            "compilerPath": "/usr/bin/avr-gcc",
+            "intelliSenseMode": "gcc-x64",
+            "configurationProvider": "ms-vscode.cmake-tools",
+            "cStandard": "gnu99",
+            "cppStandard": "c++98",
+            "defines": [],
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "compileCommands": "${workspaceFolder}/build/CMake/compile_commands.json"
+        }
+    ],
+    "version": 4
+}

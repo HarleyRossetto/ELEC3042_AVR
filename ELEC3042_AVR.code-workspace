@@ -1,0 +1,30 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"cmake.buildDirectory": "${workspaceFolder}/build/CMake",
+		"cmake.configureSettings": {
+			"CMAKE_SYSTEM": "avr",
+			"CMAKE_SYSTEM_NAME": "Generic",
+			"CMAKE_SYSTEM_VERSION": "1.0",
+			"CMAKE_CROSSCOMPILING": "TRUE",
+			"CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY"
+		},
+		"files.associations": {
+			"stdint.h": "c"
+		}
+	},
+	"extensions": {
+		"recommendations": [
+			"surajbarkale.ninja",
+			"eamodio.gitlens",
+			"donjayamanne.githistory",
+			"mhutchie.git-graph",
+			"ms-vscode.cpptools-extension-pack",
+			"rockcat.avr-support"
+		]
+	}
+}

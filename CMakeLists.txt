@@ -1,0 +1,138 @@
+cmake_minimum_required(VERSION 3.18)
+project(AVR_328 VERSION 0.1 
+                DESCRIPTION "ELEC3042 AVR Build System Template."
+                LANGUAGES C)
+
+# Project Variables
+set(BINARIES    ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+
+set(AVR_328_EXE "avr-328p")
+
+# Utility Programs
+# Programming
+set(AVR_DUDE avrdude)
+set(PROGRAMMER_TYPE arduino)
+set(PROGRAMMER_ARGS )
+
+if (WIN32)
+    set(PROGRAMMER_PORT COM3)
+elseif(UNIX AND NOT APPLE)
+    set(PROGRAMMER_PORT /dev/ttyACM0)
+else()
+    set(PROGRAMMER_PORT set_programming_port)
+endif()
+
+
+# Output Files
+set(AVR_328_ELF ${AVR_328_EXE}.elf)
+set(AVR_328_BIN ${AVR_328_EXE}.bin)
+set(AVR_328_HEX ${AVR_328_EXE}.hex)
+set(AVR_328_ASM ${AVR_328_EXE}.asm)
+set(AVR_328_MAP ${AVR_328_EXE}.map)
+set(AVR_328_SYM ${AVR_328_EXE}.sym)
+
+# Directories
+set(AVR_ELF_FILE ${BINARIES}/elf/${AVR_328_ELF})
+set(AVR_HEX_FILE ${BINARIES}/hex/${AVR_328_HEX})
+
+# Chip Variables
+set(MCU atmega328p)
+set(MCU_OPT ATmega328)
+set(CPU_FREQ 16000000UL)
+set(BAUD 9600)
+
+# Language Variables
+set(CSTD gnu99)
+
+#set(SOURCES src/main.c)
+set(SOURCES src/week3/w3p1.c)
+
+add_executable(${AVR_328_ELF} ${SOURCES})
+
+set_target_properties(${AVR_328_ELF}
+                        PROPERTIES
+                            RUNTIME_OUTPUT_DIRECTORY ${BINARIES}/elf
+                            LIBRARY_OUTPUT_DIRECTORY ${BINARIES}/lib
+                            ARCHIVE_OUTPUT_DIRECTORY ${BINARIES}/lib
+) 
+
+target_compile_definitions(${AVR_328_ELF}
+                            PUBLIC
+                                F_CPU=${CPU_FREQ}
+                                BAUD=${BAUD}
+                                __${MCU_OPT}__
+) 
+
+target_include_directories(${AVR_328_ELF}
+                            PRIVATE
+                                ${CMAKE_CURRENT_SOURCE_DIR}/src/
+                                ${CMAKE_CURRENT_SOURCE_DIR}/include
+                                ${CMAKE_CURRENT_SOURCE_DIR}/lib/include
+)
+
+target_compile_options(${AVR_328_ELF}
+                        PUBLIC
+                            -mmcu=${MCU}            # MCU
+                            -std=${CSTD}            # C Standard
+                            -Os                     # Optimise
+
+                            -Wall                   # Enable Warnings
+                            
+                            -ffunction-sections     # Place each function or data item into its own section in the output file
+                            -fdata-sections         # if the target supports arbitrary sections.
+                                                    # Use these options where the linker can perform optimisations to improve locality
+                                                    # of reference in the instruction space.
+
+                            -fshort-enums           # Allocate to an 'enum' type only as many bytes as it needs for the delcared range of possible values.
+                                                    # The 'enum' type will be equivalent to the smallest integer type which has enough room.
+
+                            -fno-common             # Controls the placement of uninitialised global variables in C code.
+                                                    # Specifies that the compiler should place uninitialised global variables in the data section
+                                                    # of the object file, rather than generating them as common blocks.
+                                                    # Will give a multiple definition error if the symbol is declared more than once.
+
+                            -funsigned-char         # Let the type 'char' be unsigned, like 'unsigned char'.
+
+                            -funsigned-bitfields    # Controls whether a bit-field is signed of unsigned. In this case unsigned.
+)
+
+target_link_options(${AVR_328_ELF}
+                    PUBLIC
+                        -mmcu=${MCU}
+                        -Wl,--gc-sections       # Pass option as an option to the Linker
+ )
+
+#
+#   Target Custom Commands
+#
+
+# Converts an .ELF to .BIN
+add_custom_target(objcopy-bin
+                  DEPENDS ${AVR_328_ELF}
+)
+add_custom_command(TARGET objcopy-bin
+                   USES_TERMINAL
+                   COMMAND ${CMAKE_OBJCOPY} -O binary ${AVR_ELF_FILE} ${BINARIES}/${AVR_328_BIN})
+
+# Converts an .ELF to .HEX
+add_custom_target(  hex 
+                    DEPENDS ${AVR_328_ELF})
+add_custom_command( TARGET hex
+                    USES_TERMINAL
+                    COMMAND ${CMAKE_OBJCOPY} -Oihex ${AVR_ELF_FILE} ${BINARIES}/hex/${AVR_328_HEX})                    
+
+
+# Generates approximiation of assembly code based on elf
+add_custom_target(  disassemble 
+                    DEPENDS ${AVR_328_ELF})
+add_custom_command( TARGET disassemble
+                    USES_TERMINAL
+                    COMMAND ${CMAKE_OBJDUMP} -C -I -d -S ${AVR_ELF_FILE} > ${BINARIES}/disassembly/${AVR_328_ASM})
+
+# Flashes the MCU with the executable
+add_custom_target(flash
+                  DEPENDS hex)
+add_custom_command(TARGET flash
+                    USES_TERMINAL
+                    COMMAND ${AVR_DUDE} -v -c ${PROGRAMMER_TYPE} -p ${MCU} ${PROGRAMMER_ARGS} -P ${PROGRAMMER_PORT} -b115200 -U flash:w:${AVR_HEX_FILE})
+    
