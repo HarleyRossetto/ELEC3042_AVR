@@ -4,23 +4,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "ELF to BIN",
-            "type": "shell",
-            "command": "ninja -C ${workspaceFolder}/build/CMake/ objcopy-bin",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "problemMatcher": []
-        },  
-        {
             "label": "Dissassemble",
             "type": "shell",
-            "command": "ninja -C ${workspaceFolder}/build/CMake/ disassemble",
+            "command": "ninja -C ${workspaceFolder}/build/CMake/ disassemble-${input:Executable}",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
@@ -34,7 +20,7 @@
         {
             "label": "Flash",
             "type": "shell",
-            "command": "ninja -C ${workspaceFolder}/build/CMake/ flash",
+            "command": "ninja -C ${workspaceFolder}/build/CMake/ flash-${input:Executable}",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
@@ -44,20 +30,19 @@
                 "clear": false
             },
             "problemMatcher": []
-        },
+        }
+    ],
+    "inputs": [
         {
-            "label": "ELF to HEX",
-            "type": "shell",
-            "command": "ninja -C ${workspaceFolder}/build/CMake/ hex",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "problemMatcher": []
-        },
+            "type": "pickString",
+            "id": "Executable",
+            "description": "Select executable",
+            "options": [
+                "main",
+                "assessment_minor",
+                "week3"
+            ],
+            "default": "assessment_minor"
+        }
     ]
 }

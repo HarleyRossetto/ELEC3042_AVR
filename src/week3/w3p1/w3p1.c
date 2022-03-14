@@ -75,9 +75,9 @@ int main(void) {
 
     long loop_num = 0;
     digits[0] = 0;
-    digits[1] = 8;
-    digits[2] = 8;
-    digits[3] = 8;
+    digits[1] = 6;
+    digits[2] = 6;
+    digits[3] = 6;
 
     while (1) {
         for (int i = 0; i < 100; i++) {

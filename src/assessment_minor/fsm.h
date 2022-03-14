@@ -2,8 +2,7 @@
 #define FSM_H
 
 #include "stdint.h"
-
-typedef unsigned char BOOL;
+#include "bool.h"
 
 typedef BOOL (*FSM_TRIGGER)();
 typedef void (*FSM_ACTION)();
@@ -20,5 +19,15 @@ typedef struct
     FSM_ACTION action;
     FSM_STATE nextState;
 } FSM_TRANSITION;
+
+
+#define FSM_TRANSITION_MAX 8
+typedef struct 
+{
+    FSM_STATE currentState;
+    FSM_TRANSITION transitions[FSM_TRANSITION_MAX];
+} FSM_TRANSITION_TABLE;
+
+void noAction() { }
 
 #endif
