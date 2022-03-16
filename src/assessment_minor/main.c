@@ -234,6 +234,26 @@ FSM_TRANSITION timeSetMinToHr = {SET_TIME_MODE_MIN, setPressed, noAction, DISPLA
 FSM_TRANSITION timeSetMinIncrement = {SET_TIME_MODE_MIN, incrementPressed, incrementMinute, SET_TIME_MODE_MIN};
 FSM_TRANSITION timeSetMinDecrement = {SET_TIME_MODE_MIN, decrementPressed, decrementMinute, SET_TIME_MODE_MIN};
 
+struct Time {
+    uint8_t hours;
+    uint8_t minutes;
+    uint8_t seconds;
+};
+
+struct Time clock;
+
+void addSecond(struct Time* clock) {
+    clock->seconds++;
+
+    if (clock->seconds == 60) {
+        clock->minutes++;
+        clock->seconds = 0;
+    }
+    if (clock->minutes == 60) {
+        clock->hours++;
+        clock->minutes = 0;
+    }
+}
 
 int main()
 {
@@ -297,7 +317,8 @@ ISR(TIMER1_COMPA_vect)
 
     if (tick == 2)
     {
-        secondsElasped++;
+        //secondsElasped++;
+        addSecond(&clock);
         tick = 0;
     }
 }
@@ -305,16 +326,30 @@ ISR(TIMER1_COMPA_vect)
 volatile uint32_t adcValue = 0;
 volatile DisplayData displayData = {{1, 2, 3, 4}};
 
+
+
 ISR(TIMER0_COMPA_vect)
 {
     // uint32_t secondsTemp = secondsElasped;
     updateTimeDisplay = true;
     uint32_t secondsTemp = secondsElasped;
 
-    displayData.data[3] = mapChar(secondsTemp & 0x0F);
-    displayData.data[2] = mapChar((secondsTemp >> 4) & 0x0F);
-    displayData.data[1] = mapChar((secondsTemp >> 8) & 0x0F);
-    displayData.data[0] = mapChar((secondsTemp >> 16) & 0x0F);
+    // displayData.data[3] = mapChar(secondsTemp & 0x0F);
+    // displayData.data[2] = mapChar((secondsTemp >> 4) & 0x0F);
+    // displayData.data[1] = mapChar((secondsTemp >> 8) & 0x0F);
+    // displayData.data[0] = mapChar((secondsTemp >> 16) & 0x0F);
+
+    uint8_t sl = clock.seconds % 10;
+    uint8_t sh = clock.seconds / 10;
+
+    uint8_t ml = clock.minutes % 10;
+    uint8_t mh = clock.minutes / 10;
+
+    displayData.data[3] = mapChar(sl);
+    displayData.data[2] = mapChar(sh);
+    displayData.data[1] = mapChar(ml);
+    displayData.data[0] = mapChar(mh);
+
     // Decimal Point
     displayData.data[1] &= (withDp ? mapChar(DP) : 0xFF);
 
