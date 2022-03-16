@@ -2,4 +2,8 @@
 *.asm
 *.bin
 *.hex
+
+build/**
 build/CMake/**
+build/.cmake/**
+build/CMakeFiles/**
