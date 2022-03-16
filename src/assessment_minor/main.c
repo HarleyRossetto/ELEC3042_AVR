@@ -46,12 +46,12 @@ void sendData(uint8_t data, DisplaySegment segIndex)
 /**
  * @brief   Prepares Timer 1 for use as the primary time-keeping clock.
  *          NOTE: This does not start the timer, enableTimer(TC1, PRESCALER); must be called to do so.
- * 
+ *
  */
 void initialiseTimer1()
 {
     // Timer/Counter Control Register A (Compare Output Modes and Waveform Generation Modes (bits 11 and 10))
-    TCCR1A = (0 << WGM11) | (0 << WGM10);    // Waveform Generation Mode - CTC
+    TCCR1A = (0 << WGM11) | (0 << WGM10); // Waveform Generation Mode - CTC
 
     // Timer/Counter Control Register C (Force Output Compare)
     TCCR1C = 0x00;
@@ -60,7 +60,7 @@ void initialiseTimer1()
     TCNT1 = 0;
 
     // Output Compare Register A
-    OCR1A = TIMER1_TICKS_PER_SECOND_1024;
+    OCR1A = TIMER1_TICKS_PER_SECOND_1024 / 2;
     // Output Compare Register B
     OCR1B = 0;
 
@@ -68,7 +68,7 @@ void initialiseTimer1()
     ICR1 = 0x0;
 
     // Timer/Counter Interrupt Mask Register (Input Capture Interrupt Enable, Output Compare A/B Match Interrupt Enable, and Overflow Interrupt Enable)
-    TIMSK1 = (1 << OCIE1A); // Output Compare A Interrupt Enable
+    TIMSK1 = (1 << OCIE1A); // Output Compare A & B Interrupt Enable
 
     // Timer/Counter Interrupt Flag Register (Input Capture, Output Compare A/B and Overflow Flags)
     TIFR1 = 0x00; // Ensure all timer interrupt flags are cleared.
@@ -80,7 +80,8 @@ void initialiseTimer1()
     //(1 << CS12) | (0 << CS11) | (1 << CS10);   //Clock Select - 1024 prescaler
 }
 
-void initialiseTimer0() {
+void initialiseTimer0()
+{
     TCCR0A = (1 << WGM01) | (0 << WGM00);
     TCCR0B = (0 << WGM02);
     TCNT0 = 0;
@@ -92,9 +93,9 @@ void initialiseTimer0() {
 
 volatile uint32_t secondsElasped = 0;
 
-#define ADC_VREF_OFF    (0 << REFS1) | (0 << REFS0)
-#define ADC_VREF_AVCC   (0 << REFS1) | (1 << REFS0)
-#define ADC_VREF_AREF   (1 << REFS1) | (1 << REFS0)
+#define ADC_VREF_OFF (0 << REFS1) | (0 << REFS0)
+#define ADC_VREF_AVCC (0 << REFS1) | (1 << REFS0)
+#define ADC_VREF_AREF (1 << REFS1) | (1 << REFS0)
 
 #define ADC_CH_0 0b0000
 #define ADC_CH_1 0b0001
@@ -106,38 +107,38 @@ volatile uint32_t secondsElasped = 0;
 #define ADC_CH_7 0b0111
 #define ADC_CH_8 0b1000
 
-
-void initialiseADC() {
+void initialiseADC()
+{
     // ADC Multiplexer Selection Register
-    ADMUX = ADC_VREF_AVCC | ADC_CH_0;
+    ADMUX = ADC_VREF_AVCC | ADC_CH_0 | (1 << ADLAR);
 
     // ADC Control and Status Register A
     // Enabled ADC, Enable Interrupts, Enable Auto Trigger
-    ADCSRA = (1 << ADEN) | 
-             (1 << ADIE) | 
-             (1 << ADATE) | 
-             (1 << ADPS1) | (1 << ADPS0) | 
+    ADCSRA = (1 << ADEN) |
+             (1 << ADIE) |
+             (1 << ADATE) |
+             (1 << ADPS1) | (1 << ADPS0) |
              (1 << ADSC);
-    
+
     // ADC Control and Status Register B
     // Sample based on timer0 compare A. NOT a great method because period can change. Timer0 used
     // for 7 segment brightness.
-    ADCSRB = (0 << ADTS2) | (1 << ADTS1) | (1 << ADTS0); 
+    ADCSRB = (0 << ADTS2) | (1 << ADTS1) | (1 << ADTS0);
 
     // ADC Data Register
     ADC = 0;
-    
-    //Digital Inout Disable Register
-    DIDR0 = (1 << ADC0D); //Disable digital input on AD0
+
+    // Digital Inout Disable Register
+    DIDR0 = (1 << ADC0D); // Disable digital input on AD0
 }
 
-int initialise()
-{
+int initialise() {
     initialiseTimer1();
     initialiseTimer0();
     initialiseADC();
 
     DDRB = (1 << PB3) | (1 << PB0);
+    PORTB = (1 << PB3); // D3 tick LED
     DDRD = (1 << PD7) | (1 << PD4);
     return 1;
 }
@@ -155,12 +156,16 @@ void showDigits()
 {
     for (int i = 0; i < 4; i++)
     {
-        sendData(SEGMENT_MAP[digits[i]], (1 << i));
+        sendData(digits[i], (1 << i));
     }
-    //Clear all displays
-    sendData(SEGMENT_MAP[16], 0x0F);
+    // Clear all displays
+    sendData(0xFF, 0x0F);
 }
 
+#define mapChar(c)  SEGMENT_MAP[c]
+
+volatile bool updateTimeDisplay = false;
+volatile bool withDp = false;
 int main(void)
 {
     if (!initialise())
@@ -172,6 +177,20 @@ int main(void)
 
     while (1)
     {
+        // if (updateTimeDisplay)
+        // {
+        //     uint32_t secondsTemp = secondsElasped;
+
+        //     digits[3] = mapChar(secondsTemp & 0xFF);
+        //     digits[2] = mapChar((secondsTemp >> 8) & 0xFF);
+        //     digits[1] = mapChar((secondsTemp >> 16) & 0xFF);
+        //     digits[0] = mapChar((secondsTemp >> 24) & 0xFF);
+        //     //Decimal Point
+        //     digits[1] &= (withDp ? mapChar(DP) : 0xFF);
+
+        //     showDigits();
+        //     updateTimeDisplay = false;
+        // }
     }
 
     return 0;
@@ -179,22 +198,48 @@ int main(void)
 
 ISR(TIMER1_COMPA_vect)
 {
-    secondsElasped++;
-
+    static uint8_t tick;
+    tick++;
     PORTB ^= (1 << PB3);
+
+    withDp = (tick == 1);
+
+    if (tick == 2)
+    {
+        secondsElasped++;
+        tick = 0;
+    }
 }
 
-ISR(TIMER0_COMPA_vect) {
+volatile uint32_t adcValue = 0;
+
+ISR(TIMER0_COMPA_vect)
+{
+    // uint32_t secondsTemp = secondsElasped;
+    updateTimeDisplay = true;
     uint32_t secondsTemp = secondsElasped;
-    digits[3] = secondsTemp & 0x0F;
-    digits[2] = (secondsTemp >> 4) & 0x0F;
-    digits[1] = (secondsTemp >> 8) & 0x0F;
-    digits[0] = (secondsTemp >> 12) & 0x0F;
+
+    digits[3] = mapChar(secondsTemp & 0x0F);
+    digits[2] = mapChar((secondsTemp >> 4) & 0x0F);
+    digits[1] = mapChar((secondsTemp >> 8) & 0x0F);
+    digits[0] = mapChar((secondsTemp >> 16) & 0x0F);
+    //Decimal Point
+    digits[1] &= (withDp ? mapChar(DP) : 0xFF);
+
     showDigits();
 }
 
-ISR(ADC_vect) {
-    // PORTB ^= (1 << PB3);
-    // secondsElasped = ADC; //Set timer output compare to ADC value
-    OCR0A = ADCL;
+#define ADC_LOWER_BUG_LIMIT 0x4
+
+ISR(ADC_vect)
+{   
+     //Set timer output compare to ADC value
+    OCR0A = ADCH;
+
+
+    if (OCR0A < ADC_LOWER_BUG_LIMIT) {
+        OCR0A = ADC_LOWER_BUG_LIMIT;
+    }
+
+    adcValue = OCR0A;
 }
