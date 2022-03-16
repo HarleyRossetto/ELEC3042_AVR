@@ -4,15 +4,15 @@
 #include "stdint.h"
 #include "bool.h"
 
-typedef BOOL (*FSM_TRIGGER)();
+typedef bool (*FSM_TRIGGER)();
 typedef void (*FSM_ACTION)();
 
-typedef enum
+typedef enum FSM_STATES
 {
     DISPLAY_HH_MM, DISPLAY_MM_SS, SET_TIME_MODE_HR, SET_TIME_MODE_MIN
 } FSM_STATE;
 
-typedef struct
+typedef struct 
 {
     FSM_STATE currentState;
     FSM_TRIGGER trigger;
@@ -21,7 +21,7 @@ typedef struct
 } FSM_TRANSITION;
 
 
-#define FSM_TRANSITION_MAX 8
+#define FSM_TRANSITION_MAX 9
 typedef struct 
 {
     FSM_STATE currentState;
@@ -29,5 +29,10 @@ typedef struct
 } FSM_TRANSITION_TABLE;
 
 void noAction() { }
+bool noEvent() {
+    return true;
+}
+
+void FSMUpdate(FSM_TRANSITION_TABLE *table);
 
 #endif
