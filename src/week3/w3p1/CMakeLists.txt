@@ -20,12 +20,12 @@ set(TARGET_HEX ${TARGET}.hex)
 ####################################################################################################
 
 # Output Files
-set(TARGET_ELF TARGET.elf)
-set(TARGET_BIN TARGET.bin)
-set(TARGET_HEX TARGET.hex)
-set(TARGET_ASM TARGET.asm)
-set(TARGET_MAP TARGET.map)
-set(TARGET_SYM TARGET.sym)
+set(TARGET_ELF ${TARGET}.elf)
+set(TARGET_BIN ${TARGET}.bin)
+set(TARGET_HEX ${TARGET}.hex)
+set(TARGET_ASM ${TARGET}.asm)
+set(TARGET_MAP ${TARGET}.map)
+set(TARGET_SYM ${TARGET}.sym)
 
 # Directories
 set(${TARGET}_HEX_FILE ${BINARIES}/${TARGET}/hex/${TARGET_HEX})
