@@ -84,7 +84,7 @@ void initialiseTimer0() {
     TCCR0A = (1 << WGM01) | (0 << WGM00);
     TCCR0B = (0 << WGM02);
     TCNT0 = 0;
-    OCR0A = 254;
+    OCR0A = 255;
     OCR0B = 0;
     TIMSK0 = (1 << OCIE0A);
     TIFR0 = 0x00;
@@ -109,7 +109,7 @@ volatile uint32_t secondsElasped = 0;
 
 void initialiseADC() {
     // ADC Multiplexer Selection Register
-    ADMUX = ADC_VREF_AVCC | ADC_CH_0 | (1 << ADLAR);
+    ADMUX = ADC_VREF_AVCC | ADC_CH_0;
 
     // ADC Control and Status Register A
     // Enabled ADC, Enable Interrupts, Enable Auto Trigger
@@ -135,7 +135,7 @@ int initialise()
 {
     initialiseTimer1();
     initialiseTimer0();
-    // initialiseADC();
+    initialiseADC();
 
     DDRB = (1 << PB3) | (1 << PB0);
     DDRD = (1 << PD7) | (1 << PD4);
@@ -157,6 +157,8 @@ void showDigits()
     {
         sendData(SEGMENT_MAP[digits[i]], (1 << i));
     }
+    //Clear all displays
+    sendData(SEGMENT_MAP[16], 0x0F);
 }
 
 int main(void)
@@ -184,14 +186,15 @@ ISR(TIMER1_COMPA_vect)
 
 ISR(TIMER0_COMPA_vect) {
     uint32_t secondsTemp = secondsElasped;
-    digits[3] = secondsTemp & 0xFF;
-    digits[2] = (secondsTemp >> 8) & 0xFF;
-    digits[1] = (secondsTemp >> 16) & 0xFF;
-    digits[0] = (secondsTemp >> 24) & 0xFF;
+    digits[3] = secondsTemp & 0x0F;
+    digits[2] = (secondsTemp >> 4) & 0x0F;
+    digits[1] = (secondsTemp >> 8) & 0x0F;
+    digits[0] = (secondsTemp >> 12) & 0x0F;
     showDigits();
 }
 
 ISR(ADC_vect) {
     // PORTB ^= (1 << PB3);
     // secondsElasped = ADC; //Set timer output compare to ADC value
+    OCR0A = ADCL;
 }
