@@ -13,6 +13,7 @@ set(TARGET
 set(SOURCES 
         "src/${TARGET}/main.c"
         "src/${TARGET}/fsm.h" 
+        "src/${TARGET}/fsm.c"
         "src/${TARGET}/bool.h"
         "src/${TARGET}/timers.h"
         "src/${TARGET}/display.h")

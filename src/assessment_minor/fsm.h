@@ -28,11 +28,8 @@ typedef struct
     FSM_TRANSITION transitions[FSM_TRANSITION_MAX];
 } FSM_TRANSITION_TABLE;
 
-void noAction() { }
-bool noEvent() {
-    return true;
-}
-
+void noAction();
+bool noEvent();
 void FSMUpdate(FSM_TRANSITION_TABLE *table);
 
 #endif
