@@ -49,16 +49,71 @@ void addSecond(struct Time* clock) {
 
 typedef enum
 {
-    PRESSED, RELEASED, HELD, NONE
+    NONE, PRESSED, RELEASED, HELD
 } ButtonState;
 
-#define BUTTON_CHANGE_DELAY_MS 30
+#define BUTTON_CHANGE_DELAY_MS 15
 
 typedef struct {
     ButtonState currentState;
+    ButtonState actionState;
     uint64_t lastActionTime;
     uint8_t buttonPin;
+    void(*eventPress)();
+    void(*eventRelease)();
+    bool updated;
 } Button;
+
+void buttonPress(Button* btn) {
+    btn->currentState = PRESSED;
+    btn->actionState = PRESSED;
+    btn->updated = true;
+}
+
+void buttonRelease(Button* btn) {
+    btn->currentState = RELEASED;
+    btn->actionState = RELEASED;
+    btn->updated = true;
+}
+
+ButtonState buttonReadActionState(Button *btn) {
+    ButtonState result = btn->actionState;
+    btn->actionState = NONE;
+    return result;
+}
+
+bool buttonHasNewPress(Button *btn) {
+    return btn->updated && btn->currentState == PRESSED;
+}
+
+void set_Pressed() {
+    PORTB &= ~(1 << PB5);
+}
+
+void set_Released() {
+    PORTB |= (1 << PB5);
+}
+
+void inc_Pressed() {
+    PORTB &= ~(1 << PB4);
+}
+
+void inc_Released() {
+    PORTB |= (1 << PB4);
+}
+
+bool moveToNextState = false;
+void dec_Pressed()
+{
+    // PORTB &= ~(1 << PB3);
+    // moveToNextState = true;
+}
+
+void dec_Released() {
+    // moveToNextState = false;
+    // PORTB |= (1 << PB3);
+}
+
 
 #define BUTTON_SET PC1
 #define BUTTON_SET_INT PCINT9
@@ -71,9 +126,9 @@ typedef struct {
 #define BUTTON_DDR DDRC
 #define BUTTON_IN PINC
 
-volatile Button buttonSet = {RELEASED, 0, BUTTON_SET};
-volatile Button buttonInc = {RELEASED, 0, BUTTON_INCREMENT};
-volatile Button buttonDec = {RELEASED, 0, BUTTON_DECREMENT};
+volatile Button buttonSet = {RELEASED, NONE, 0, BUTTON_SET, set_Pressed, set_Released, false};
+volatile Button buttonInc = {RELEASED, NONE, 0, BUTTON_INCREMENT, inc_Pressed, inc_Released, false};
+volatile Button buttonDec = {RELEASED, NONE, 0, BUTTON_DECREMENT, dec_Pressed, dec_Released, false};
 
 #define BUTTON_COUNT 3
 volatile Button buttons[BUTTON_COUNT];
@@ -88,6 +143,10 @@ bool decrementPressed();
 /// BUTTONS
 
 /// DISPLAY
+
+volatile DisplayData displayData = {{1, 2, 3, 4}};
+
+void (*displaySetData)();
 
 #define DISPLAY_PORT PORTB
 #define DISPLAY_DDR DDRB
@@ -266,32 +325,17 @@ bool displayPressed()
 
 bool setPressed()
 {
-    bool result = buttonSet.currentState == PRESSED;
-    if (result)
-        buttonSet.currentState = NONE;
-
-    return result;
+    return buttonHasNewPress(&buttonSet);
 }
 
 bool incrementPressed()
 {
-    bool result = buttonInc.currentState == PRESSED;
-    if (result)
-        buttonInc.currentState = NONE;
-
-    return result;
+    return buttonHasNewPress(&buttonInc);
 }
 
 bool decrementPressed()
 {
-    bool result = buttonDec.currentState == PRESSED;
-    if (result) {
-        buttonDec.currentState = NONE;
-        PORTB &= ~(1 << PB3);
-
-    }
-
-    return result;
+    return buttonHasNewPress(&buttonDec);
 }
 
 void incrementHour()
@@ -312,64 +356,123 @@ void decrementMinute()
 
 /// Finite State Machine
 
-FSM_TRANSITION displayHoursToDisplayMinutes = {DISPLAY_HH_MM, displayPressed, noAction, DISPLAY_MM_SS};
-FSM_TRANSITION displayHoursToSetTime = {DISPLAY_HH_MM, setPressed, noAction, SET_TIME_MODE_HR};
-FSM_TRANSITION displayMinutesToDisplayHours = {DISPLAY_MM_SS, displayPressed, noAction, DISPLAY_HH_MM};
-FSM_TRANSITION timeSetHrToMin = {SET_TIME_MODE_HR, setPressed, noAction, SET_TIME_MODE_MIN};
-FSM_TRANSITION timeSetHrIncrement = {SET_TIME_MODE_HR, incrementPressed, incrementHour, SET_TIME_MODE_HR};
-FSM_TRANSITION timeSetHrDecrement = {SET_TIME_MODE_HR, decrementPressed, decrementHour, SET_TIME_MODE_HR};
-FSM_TRANSITION timeSetMinToHr = {SET_TIME_MODE_MIN, setPressed, noAction, DISPLAY_HH_MM};
-FSM_TRANSITION timeSetMinIncrement = {SET_TIME_MODE_MIN, incrementPressed, incrementMinute, SET_TIME_MODE_MIN};
-FSM_TRANSITION timeSetMinDecrement = {SET_TIME_MODE_MIN, decrementPressed, decrementMinute, SET_TIME_MODE_MIN};
+FSM_TRANSITION displayHoursToDisplayMinutes = {DISPLAY_HH_MM,       displayPressed,     noAction, DISPLAY_MM_SS};
+FSM_TRANSITION displayHoursToSetTime        = {DISPLAY_HH_MM,       setPressed,         noAction, SET_TIME_MODE_HR};
+FSM_TRANSITION displayMinutesToDisplayHours = {DISPLAY_MM_SS,       displayPressed,     noAction, DISPLAY_HH_MM};
+FSM_TRANSITION timeSetHrToMin               = {SET_TIME_MODE_HR,    setPressed,         noAction, SET_TIME_MODE_MIN};
+FSM_TRANSITION timeSetHrIncrement           = {SET_TIME_MODE_HR,    incrementPressed,   incrementHour, SET_TIME_MODE_HR};
+FSM_TRANSITION timeSetHrDecrement           = {SET_TIME_MODE_HR,    decrementPressed,   decrementHour, SET_TIME_MODE_HR};
+FSM_TRANSITION timeSetMinToHr               = {SET_TIME_MODE_MIN,   setPressed,         noAction, DISPLAY_HH_MM};
+FSM_TRANSITION timeSetMinIncrement          = {SET_TIME_MODE_MIN,   incrementPressed,   incrementMinute, SET_TIME_MODE_MIN};
+FSM_TRANSITION timeSetMinDecrement          = {SET_TIME_MODE_MIN,   decrementPressed,   decrementMinute, SET_TIME_MODE_MIN};
 
 /// Finite State Machine
 
+uint8_t currentState = 0;
+
+bool transitioned = false;
+uint8_t matches = 0;
+bool triggered = false;
+void displayCurrentState()
+{
+    displayData.data[3] = mapChar(currentState);    //Far Right -> Current State Index
+    displayData.data[2] = mapChar(triggered ? 9 : 0); //Center Right -> 9 if triggered, 0 if not.
+    displayData.data[1] = mapChar(matches);         //Centre Left -> FSM Matches for current state.
+    displayData.data[0] = mapChar(transitioned);    //Far Left -> FSM has transitioned.
+}
+
+void displayTime() {
+    uint8_t sl = clock.seconds % 10;
+    uint8_t sh = clock.seconds / 10;
+
+    uint8_t ml = clock.minutes % 10;
+    uint8_t mh = clock.minutes / 10;
+
+    displayData.data[3] = mapChar(sl);  //Far Right
+    displayData.data[2] = mapChar(sh);  //Centre Right
+    displayData.data[1] = mapChar(ml);  //Center Left
+    displayData.data[0] = mapChar(mh);  //Far Left
+
+    // Decimal Point
+    displayData.data[1] &= (withDp ? mapChar(DP) : 0xFF);
+}
+
 volatile bool buttonInterruptTriggered = false;
 
-void updateSetButton() {
-    // Debounce: if the time since the last action exceeds the debounce time, proceed.
-    if (currentTimeMilliseconds - buttonSet.lastActionTime > BUTTON_CHANGE_DELAY_MS) {
-        //Calculate milliseconds elasped since last clock call.
-        uint16_t  millisElaspedAtInterruptCall = (TCNT1 * 500 / (TIMER1_TICKS_PER_SECOND_1024 / 2));
-        addMillisecondsToSystemCounter(millisElaspedAtInterruptCall);
-
-        buttonSet.lastActionTime = currentTimeMilliseconds;
-        // If the button was last considered released and is now pressed.
-        if (buttonSet.currentState != PRESSED && isPressed(BUTTON_SET, BUTTON_IN))
-        {
-            buttonSet.currentState = PRESSED;
-        } 
-        // Otherwise if button was last considered pressed and is now released.
-        else if (buttonSet.currentState != RELEASED && !isPressed(BUTTON_SET, BUTTON_IN)) {
-            buttonSet.currentState = RELEASED;
-        }
-    }
+bool buttonTimingCorrect(Button *btn) {
+    return currentTimeMilliseconds - btn->lastActionTime > BUTTON_CHANGE_DELAY_MS;
 }
 
 void updateButton(Button* btn) {
-    // Debounce: if the time since the last action exceeds the debounce time, proceed.
-    if (currentTimeMilliseconds - btn->lastActionTime > BUTTON_CHANGE_DELAY_MS) {
-        //Calculate milliseconds elasped since last clock call.
+
+    // If the button was last considered released and is now pressed.
+    if (btn->currentState == RELEASED && isPressed(btn->buttonPin, BUTTON_IN) && buttonTimingCorrect(btn))
+    {
+         //Calculate milliseconds elasped since last clock call.
         uint16_t  millisElaspedAtInterruptCall = (TCNT1 * 500 / (TIMER1_TICKS_PER_SECOND_1024 / 2));
         addMillisecondsToSystemCounter(millisElaspedAtInterruptCall);
 
-        btn->lastActionTime = currentTimeMilliseconds;
-        // If the button was last considered released and is now pressed.
-        if (btn->currentState != PRESSED && isPressed(BUTTON_SET, BUTTON_IN))
-        {
-            btn->currentState = PRESSED;
-        } 
-        // Otherwise if button was last considered pressed and is now released.
-        else if (btn->currentState != RELEASED && !isPressed(BUTTON_SET, BUTTON_IN)) {
-            btn->currentState = RELEASED;
-        }
+        buttonPress(btn);
+        // btn->currentState = PRESSED;
+        if (btn->eventPress)
+            btn->eventPress();
     }
+    // Otherwise if button was last considered pressed and is now released.
+    else if (btn->currentState == PRESSED && !isPressed(btn->buttonPin, BUTTON_IN) && buttonTimingCorrect(btn)) 
+    {
+         //Calculate milliseconds elasped since last clock call.
+        uint16_t  millisElaspedAtInterruptCall = (TCNT1 * 500 / (TIMER1_TICKS_PER_SECOND_1024 / 2));
+        addMillisecondsToSystemCounter(millisElaspedAtInterruptCall);
+
+        buttonRelease(btn);
+        // btn->currentState = RELEASED;
+        if (btn->eventRelease)
+            btn->eventRelease();
+    }
+
+
+    // // Debounce: if the time since the last action exceeds the debounce time, proceed.
+    // if (currentTimeMilliseconds - btn->lastActionTime > BUTTON_CHANGE_DELAY_MS) {
+    //     //Calculate milliseconds elasped since last clock call.
+    //     uint16_t  millisElaspedAtInterruptCall = (TCNT1 * 500 / (TIMER1_TICKS_PER_SECOND_1024 / 2));
+    //     addMillisecondsToSystemCounter(millisElaspedAtInterruptCall);
+
+    //     btn->lastActionTime = currentTimeMilliseconds;
+    //     // If the button was last considered released and is now pressed.
+    //     if (btn->currentState != PRESSED && isPressed(btn->buttonPin, BUTTON_IN))
+    //     {
+    //         btn->currentState = PRESSED;
+    //         btn->evenPress();
+    //     }
+    //     // Otherwise if button was last considered pressed and is now released.
+    //     else if (btn->currentState != RELEASED && !isPressed(btn->buttonPin, BUTTON_IN)) {
+    //         btn->currentState = RELEASED;
+    //         btn->eventRelease();
+    //     }
+    // }
 }
 
-void updateButtons() {
+void updateAllButtons() {
     for (int i = 0; i < BUTTON_COUNT; i++) {
         updateButton(&buttons[i]);
     }
+}
+
+void fsmTransitionCallback(TransitionCallback result) {
+    switch (result.reason) {
+        case TRANSITIONED:
+            transitioned = true;
+            break;
+        case NO_MATCH: 
+            matches = result.data;
+            break;
+        case MATCHES:
+            matches = result.data;
+            break;
+        case NOT_TRIGGERED:
+            triggered = true;
+            break;
+        }
 }
 
 int main()
@@ -390,31 +493,19 @@ int main()
                                                             timeSetMinToHr,
                                                             timeSetMinIncrement,
                                                             timeSetMinDecrement}};
+    displaySetData = displayCurrentState;
 
     while (1)
     {
+        currentState = stateMachine.currentState;
+
         if (buttonInterruptTriggered) {
             buttonInterruptTriggered = false;
 
-            updateButtons();
-
-            // if (isPressed(BUTTON_SET, BUTTON_IN)) 
-            //     PORTB &= ~(1 << PB5);
-            // else
-            //     PORTB |= (1 << PB5);
-
-            // if (isPressed(BUTTON_INCREMENT, BUTTON_IN))
-            //     PORTB &= ~(1 << PB4);
-            // else
-            //     PORTB |= (1 << PB4);
-
-            // if (isPressed(BUTTON_DECREMENT, BUTTON_IN))
-            //     PORTB &= ~(1 << PB3);
-            // else
-            //     PORTB |= (1 << PB3);
+            updateAllButtons();
         }
 
-        FSMUpdate(&stateMachine);
+        FSMUpdate(&stateMachine, fsmTransitionCallback);
     }
 
     return 0;
@@ -438,23 +529,10 @@ ISR(TIMER1_COMPA_vect)
 }
 
 volatile uint32_t adcValue = 0;
-volatile DisplayData displayData = {{1, 2, 3, 4}};
 
 ISR(TIMER0_COMPA_vect)
 {
-    uint8_t sl = clock.seconds % 10;
-    uint8_t sh = clock.seconds / 10;
-
-    uint8_t ml = clock.minutes % 10;
-    uint8_t mh = clock.minutes / 10;
-
-    displayData.data[3] = mapChar(sl);
-    displayData.data[2] = mapChar(sh);
-    displayData.data[1] = mapChar(ml);
-    displayData.data[0] = mapChar(mh);
-
-    // Decimal Point
-    displayData.data[1] &= (withDp ? mapChar(DP) : 0xFF);
+    displaySetData();
 
     displayUpdate(displayData);
 }
@@ -480,22 +558,7 @@ ISR(ADC_vect)
  * 
  */
 ISR(PCINT1_vect) {
-    buttonInterruptTriggered = true;
+    if (BUTTON_IN)
+        buttonInterruptTriggered = true;
 
-    // // Map ticks elasped to milliseconds (0 - 500)
-    // uint64_t millisElaspedAtInterruptCall = (TCNT1 * 500 / (TIMER1_TICKS_PER_SECOND_1024 / 2));
-    // outOfLoopMilliseconds += millisElaspedAtInterruptCall;
-    // addMillisecondsToSystemCounter(outOfLoopMilliseconds);
-
-    // ButtonState setButtonState = getButtonState(BUTTON_IN, BUTTON_SET);
-    // if (setButtonState != buttonSet.currentState) {
-    // // If more than BUTTON_CHANGE_DELAY_MS have occured since the last action time..
-    //     if (currentTimeMilliseconds - buttonSet.lastActionTime > BUTTON_CHANGE_DELAY_MS) {
-    //         // Update states
-    //         buttonSet.previousState = buttonSet.currentState;
-    //         buttonSet.currentState = setButtonState;
-
-    //         PORTB ^= (1 << PB5);
-    //     } 
-    //}
 }
