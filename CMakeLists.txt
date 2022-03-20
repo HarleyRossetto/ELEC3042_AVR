@@ -6,3 +6,7 @@ project(AVR_328 VERSION 0.1
 include(src/assessment_minor/CMakeLists.txt)
 include(src/main/CMakeLists.txt)
 include(src/week3/w3p1/CMakeLists.txt)
+
+include(src/week4/p1/CMakeLists.txt)
+include(src/week4/p2/CMakeLists.txt)
+include(src/week4/p3/CMakeLists.txt)

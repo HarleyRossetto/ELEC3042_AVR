@@ -72,9 +72,12 @@
             "options": [
                 "main",
                 "assessment_minor",
-                "week3"
+                "week3",
+                "w4p1",
+                "w4p2",
+                "w4p3"
             ],
-            "default": "assessment_minor"
+            "default": "w4p3"
         }
     ]
 }
