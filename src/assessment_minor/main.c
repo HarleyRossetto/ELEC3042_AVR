@@ -475,12 +475,15 @@ void displayTime()
     uint8_t ml = clock.minutes % 10;
     uint8_t mh = clock.minutes / 10;
 
-    uint8_t hl = clock.hours % 10;
-    uint8_t hh = clock.hours / 10;
+    uint8_t hours = clock.hours;
 
-    if (timeMode == TWELVE_HOUR_TIME && hh > 12) {
-        hh - +12;
+    if (timeMode == TWELVE_HOUR_TIME && hours > 12) {
+        hours -= 12;
     }
+
+    uint8_t hl = hours % 10;
+    uint8_t hh = hours / 10;
+
 
     if (timeDisplayMode == HHMM) {
         displayData.data[3] = mapChar(ml);  //Far Right
@@ -495,7 +498,10 @@ void displayTime()
     }
 
     // Decimal Point
-    displayData.data[1] &= (withDp ? mapChar(DP) : 0xFF);
+    displayData.data[1] &= (withDp ? mapChar(DP) : mapChar(BLANK));
+
+    //PM Indicator
+    displayData.data[3] &= (timeMode == TWELVE_HOUR_TIME && clock.hours > 12 ? mapChar(DP) : mapChar(BLANK));
 }
 
 volatile bool buttonInterruptTriggered = false;
