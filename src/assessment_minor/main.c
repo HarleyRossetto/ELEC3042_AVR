@@ -82,36 +82,51 @@ ButtonState buttonReadActionState(Button *btn) {
     return result;
 }
 
-bool buttonHasNewPress(Button *btn) {
-    return btn->updated && btn->currentState == PRESSED;
+bool buttonHasUpdate(Button *btn) {
+    bool result = btn->updated;
+    btn->updated = false;
+    return result;
 }
 
+bool buttonHasNewPress(Button *btn) {
+    return buttonHasUpdate(btn) && btn->currentState == PRESSED;
+}
+
+bool setButtonPressed = false;
+// Set Button pressed callback
 void set_Pressed() {
     PORTB &= ~(1 << PB5);
+    setButtonPressed = true;
 }
 
+//Set Button released callback
 void set_Released() {
     PORTB |= (1 << PB5);
 }
 
+bool incrementButtonPressed = false;
+// Increment Button pressed callback
 void inc_Pressed() {
     PORTB &= ~(1 << PB4);
+    incrementButtonPressed = true;
 }
 
+//Inc Button released callback
 void inc_Released() {
     PORTB |= (1 << PB4);
 }
 
-bool moveToNextState = false;
+bool decrementButtonPressed = false;
+// Decrement Button pressed callback
 void dec_Pressed()
 {
-    // PORTB &= ~(1 << PB3);
-    // moveToNextState = true;
+    PORTB &= ~(1 << PB3);
+    decrementButtonPressed = true;
 }
 
+//Decrement Button released callback
 void dec_Released() {
-    // moveToNextState = false;
-    // PORTB |= (1 << PB3);
+    PORTB |= (1 << PB3);
 }
 
 
@@ -310,36 +325,51 @@ int initialise()
     initialiseTimer0();
     initialiseADC();
 
-    DDRB  |= (1 << PB5) | (1 << PB4) | (1 << PB3);
-    PORTB |= (1 << PB5) | (1 << PB4) | (1 << PB3);
+    DDRB  |= (1 << PB5) | (1 << PB4) | (1 << PB3) | (1 << PB2);
+    PORTB |= (1 << PB5) | (1 << PB4) | (1 << PB3) | (1 << PB2);
 
     return 1;
 }
 
 /// INITIALISERS
 
+bool buttonPressed(bool *buttonPressFlag) {
+    bool result = *buttonPressFlag;
+    if (result)
+    *buttonPressFlag = false;
+    return result;
+}
+
 bool displayPressed()
 {
-    return decrementPressed();
+    bool result = decrementPressed();
+    if (result) {
+        PORTB &= ~(1 << PB2);
+    }
+    return result;
 }
 
 bool setPressed()
 {
-    return buttonHasNewPress(&buttonSet);
+    // return buttonHasNewPress(&buttonSet);
+    return buttonPressed(&setButtonPressed);
 }
 
 bool incrementPressed()
 {
-    return buttonHasNewPress(&buttonInc);
+    // return buttonHasNewPress(&buttonInc);
+    return buttonPressed(&incrementButtonPressed);
 }
 
 bool decrementPressed()
 {
-    return buttonHasNewPress(&buttonDec);
+    // return buttonHasNewPress(&buttonDec);
+    return buttonPressed(&decrementButtonPressed);
 }
 
 void incrementHour()
 {
+    
 }
 
 void decrementHour()
@@ -429,27 +459,6 @@ void updateButton(Button* btn) {
         if (btn->eventRelease)
             btn->eventRelease();
     }
-
-
-    // // Debounce: if the time since the last action exceeds the debounce time, proceed.
-    // if (currentTimeMilliseconds - btn->lastActionTime > BUTTON_CHANGE_DELAY_MS) {
-    //     //Calculate milliseconds elasped since last clock call.
-    //     uint16_t  millisElaspedAtInterruptCall = (TCNT1 * 500 / (TIMER1_TICKS_PER_SECOND_1024 / 2));
-    //     addMillisecondsToSystemCounter(millisElaspedAtInterruptCall);
-
-    //     btn->lastActionTime = currentTimeMilliseconds;
-    //     // If the button was last considered released and is now pressed.
-    //     if (btn->currentState != PRESSED && isPressed(btn->buttonPin, BUTTON_IN))
-    //     {
-    //         btn->currentState = PRESSED;
-    //         btn->evenPress();
-    //     }
-    //     // Otherwise if button was last considered pressed and is now released.
-    //     else if (btn->currentState != RELEASED && !isPressed(btn->buttonPin, BUTTON_IN)) {
-    //         btn->currentState = RELEASED;
-    //         btn->eventRelease();
-    //     }
-    // }
 }
 
 void updateAllButtons() {
