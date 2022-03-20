@@ -12,7 +12,7 @@ typedef enum FSM_STATES
     DISPLAY_HH_MM, DISPLAY_MM_SS, SET_TIME_MODE_HR, SET_TIME_MODE_MIN
 } FSM_STATE;
 
-typedef struct 
+typedef struct FSM_TRANS
 {
     FSM_STATE currentState;
     FSM_TRIGGER trigger;
@@ -22,14 +22,31 @@ typedef struct
 
 
 #define FSM_TRANSITION_MAX 9
-typedef struct 
+typedef struct FSM_TRANS_TBL
 {
     FSM_STATE currentState;
     FSM_TRANSITION transitions[FSM_TRANSITION_MAX];
 } FSM_TRANSITION_TABLE;
 
-void noAction();
+typedef enum
+{
+    TRIGGERED,
+    NOT_TRIGGERED,
+    ACTION,
+    TRANSITIONED,
+    NO_MATCH,
+    MATCHES
+} TransitionCallbackReason;
+
+typedef struct {
+    TransitionCallbackReason reason;
+    uint8_t data;
+} TransitionCallback;
+
+void
+noAction();
 bool noEvent();
-void FSMUpdate(FSM_TRANSITION_TABLE *table);
+bool noContinue();
+void FSMUpdate(FSM_TRANSITION_TABLE *table, void (*transitionCallback)(TransitionCallback));
 
 #endif
