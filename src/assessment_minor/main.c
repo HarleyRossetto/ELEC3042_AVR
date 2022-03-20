@@ -498,6 +498,7 @@ void displayTime()
     }
 
     // Decimal Point
+    //Must show constantly when in MMSS state. Currently does not.
     displayData.data[1] &= (withDp ? mapChar(DP) : mapChar(BLANK));
 
     //PM Indicator
