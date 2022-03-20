@@ -28,10 +28,23 @@ struct Time {
 };
 
 struct Time clock;
+typedef enum
+{
+    TWELVE_HOUR_TIME,
+    TWENTY_FOUR_HOUR_TIME
+} TimeMode;
 
-void addSecond(struct Time* clock) {
-    clock->seconds++;
+TimeMode timeMode = TWELVE_HOUR_TIME;
 
+typedef enum
+{
+    HHMM,
+    MMSS
+} TimeDisplayMode;
+
+TimeDisplayMode timeDisplayMode = HHMM;
+
+void validateClock(struct Time *clock) {
     if (clock->seconds == 60) {
         clock->minutes++;
         clock->seconds = 0;
@@ -40,6 +53,37 @@ void addSecond(struct Time* clock) {
         clock->hours++;
         clock->minutes = 0;
     }
+    if (clock->hours == 24) {
+        clock->hours = 0;
+        clock->minutes = 0;
+        clock->seconds = 0;
+    }
+}
+
+void addSecond(struct Time* clock) {
+    clock->seconds++;
+
+    validateClock(clock);
+}
+
+void addMinute(struct Time* clock) {
+    clock->minutes++;
+    validateClock(clock);
+}
+
+void removeMinute(struct Time *clock) {
+    clock->minutes--;
+    validateClock(clock);
+}
+
+void addHour(struct Time* clock) {
+    clock->hours++;
+    validateClock(clock);
+}
+
+void removeHour(struct Time *clock) {
+    clock->hours--;
+    validateClock(clock);
 }
 
 /// TIMING
@@ -369,26 +413,37 @@ bool decrementPressed()
 
 void incrementHour()
 {
-    
+    addHour(&clock);
 }
 
 void decrementHour()
 {
+    removeHour(&clock);
 }
 
 void incrementMinute()
 {
+    addMinute(&clock);
 }
 
 void decrementMinute()
 {
+    removeMinute(&clock);
+}
+
+void displayHHMMAction() {
+    timeDisplayMode = HHMM;
+}
+
+void displayMMSSAction() {
+    timeDisplayMode = MMSS;
 }
 
 /// Finite State Machine
 
-FSM_TRANSITION displayHoursToDisplayMinutes = {DISPLAY_HH_MM,       displayPressed,     noAction, DISPLAY_MM_SS};
+FSM_TRANSITION displayHoursToDisplayMinutes = {DISPLAY_HH_MM,       displayPressed,     displayMMSSAction, DISPLAY_MM_SS};
 FSM_TRANSITION displayHoursToSetTime        = {DISPLAY_HH_MM,       setPressed,         noAction, SET_TIME_MODE_HR};
-FSM_TRANSITION displayMinutesToDisplayHours = {DISPLAY_MM_SS,       displayPressed,     noAction, DISPLAY_HH_MM};
+FSM_TRANSITION displayMinutesToDisplayHours = {DISPLAY_MM_SS,       displayPressed,     displayHHMMAction, DISPLAY_HH_MM};
 FSM_TRANSITION timeSetHrToMin               = {SET_TIME_MODE_HR,    setPressed,         noAction, SET_TIME_MODE_MIN};
 FSM_TRANSITION timeSetHrIncrement           = {SET_TIME_MODE_HR,    incrementPressed,   incrementHour, SET_TIME_MODE_HR};
 FSM_TRANSITION timeSetHrDecrement           = {SET_TIME_MODE_HR,    decrementPressed,   decrementHour, SET_TIME_MODE_HR};
@@ -411,17 +466,33 @@ void displayCurrentState()
     displayData.data[0] = mapChar(transitioned);    //Far Left -> FSM has transitioned.
 }
 
-void displayTime() {
+
+void displayTime()
+{
     uint8_t sl = clock.seconds % 10;
     uint8_t sh = clock.seconds / 10;
 
     uint8_t ml = clock.minutes % 10;
     uint8_t mh = clock.minutes / 10;
 
-    displayData.data[3] = mapChar(sl);  //Far Right
-    displayData.data[2] = mapChar(sh);  //Centre Right
-    displayData.data[1] = mapChar(ml);  //Center Left
-    displayData.data[0] = mapChar(mh);  //Far Left
+    uint8_t hl = clock.hours % 10;
+    uint8_t hh = clock.hours / 10;
+
+    if (timeMode == TWELVE_HOUR_TIME && hh > 12) {
+        hh - +12;
+    }
+
+    if (timeDisplayMode == HHMM) {
+        displayData.data[3] = mapChar(ml);  //Far Right
+        displayData.data[2] = mapChar(mh);  //Centre Right
+        displayData.data[1] = mapChar(hl);  //Center Left
+        displayData.data[0] = mapChar(hh);  //Far Left
+    } else {
+        displayData.data[3] = mapChar(sl);  //Far Right
+        displayData.data[2] = mapChar(sh);  //Centre Right
+        displayData.data[1] = mapChar(ml);  //Center Left
+        displayData.data[0] = mapChar(mh);  //Far Left
+    }
 
     // Decimal Point
     displayData.data[1] &= (withDp ? mapChar(DP) : 0xFF);
@@ -502,7 +573,7 @@ int main()
                                                             timeSetMinToHr,
                                                             timeSetMinIncrement,
                                                             timeSetMinDecrement}};
-    displaySetData = displayCurrentState;
+    displaySetData = displayTime;
 
     while (1)
     {
