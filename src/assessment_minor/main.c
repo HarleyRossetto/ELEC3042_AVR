@@ -23,7 +23,7 @@ void enableTimers()
     enableTimer(TC0, CLOCK_SELECT_1024_PRESCALER);
 }
 
-Time clock;
+volatile Time clock;
 
 typedef enum
 {
@@ -46,31 +46,31 @@ TimeDisplayMode timeDisplayMode = HHMM;
 
 /// BUTTONS
 
-void buttonPress(Button* btn) {
+void buttonPress(volatile Button* btn) {
     btn->currentState = PRESSED;
     btn->actionState = PRESSED;
     btn->updated = true;
 }
 
-void buttonRelease(Button* btn) {
+void buttonRelease(volatile Button* btn) {
     btn->currentState = RELEASED;
     btn->actionState = RELEASED;
     btn->updated = true;
 }
 
-ButtonState buttonReadActionState(Button *btn) {
+ButtonState buttonReadActionState(volatile Button *btn) {
     ButtonState result = btn->actionState;
     btn->actionState = NONE;
     return result;
 }
 
-bool buttonHasUpdate(Button *btn) {
+bool buttonHasUpdate(volatile Button *btn) {
     bool result = btn->updated;
     btn->updated = false;
     return result;
 }
 
-bool buttonHasNewPress(Button *btn) {
+bool buttonHasNewPress(volatile Button *btn) {
     return buttonHasUpdate(btn) && btn->currentState == PRESSED;
 }
 
@@ -143,7 +143,8 @@ bool decrementPressed();
 
 volatile DisplayData displayData = {{1, 2, 3, 4}};
 
-void (*displaySetData)();
+typedef void (*DisplayFunctionPointer)();
+DisplayFunctionPointer displayFunction;
 
 #define DISPLAY_PORT PORTB
 #define DISPLAY_DDR DDRB
@@ -154,7 +155,7 @@ void (*displaySetData)();
 #define DISPLAY_SHIFT_PIN PD7
 #define DISPLAY_LATCH_PIN PD4
 
-inline void shiftBit()
+inline void displayShiftBit()
 {
     DISPLAY_CLOCK_PORT = (0 << DISPLAY_SHIFT_PIN);
     DISPLAY_CLOCK_PORT = (1 << DISPLAY_SHIFT_PIN);
@@ -175,7 +176,7 @@ void displaySendData(uint8_t data, DisplaySegment segIndex)
         uint8_t bitToSend = (buffer >> i) & 1;
         DISPLAY_PORT = (DISPLAY_PORT & ~(1 << DISPLAY_DATA_IN)) |
                        (bitToSend << DISPLAY_DATA_IN);
-        shiftBit();
+        displayShiftBit();
     }
     displayLatch();
 }
@@ -255,6 +256,8 @@ void initialiseTimer0()
     TIFR0 = 0x00;
 }
 
+#define ADC_AUTO_TRIGGER_SOURCE_TCC0_COMPARE_MATCH_A ((0 << ADTS2) | (1 << ADTS1) | (1 << ADTS0))
+
 void initialiseADC()
 {
     // ADC Multiplexer Selection Register
@@ -268,7 +271,7 @@ void initialiseADC()
     // ADC Control and Status Register B
     // Sample based on timer0 compare A. NOT a great method because period can
     // change. Timer0 used for 7 segment brightness.
-    ADCSRB = (0 << ADTS2) | (1 << ADTS1) | (1 << ADTS0);
+    ADCSRB = ADC_AUTO_TRIGGER_SOURCE_TCC0_COMPARE_MATCH_A;
 
     // ADC Data Register
     ADC = 0;
@@ -318,17 +321,14 @@ int initialise()
 bool buttonPressed(bool *buttonPressFlag) {
     bool result = *buttonPressFlag;
     if (result)
-    *buttonPressFlag = false;
+        *buttonPressFlag = false;
+
     return result;
 }
 
 bool displayPressed()
 {
-    bool result = decrementPressed();
-    if (result) {
-        PORTB &= ~(1 << PB2);
-    }
-    return result;
+    return decrementPressed();
 }
 
 bool setPressed()
@@ -377,26 +377,13 @@ void displayMMSSAction() {
     timeDisplayMode = MMSS;
 }
 
-/// Finite State Machine
-
-FSM_TRANSITION displayHoursToDisplayMinutes = {DISPLAY_HH_MM,       displayPressed,     displayMMSSAction, DISPLAY_MM_SS};
-FSM_TRANSITION displayHoursToSetTime        = {DISPLAY_HH_MM,       setPressed,         noAction, SET_TIME_MODE_HR};
-FSM_TRANSITION displayMinutesToDisplayHours = {DISPLAY_MM_SS,       displayPressed,     displayHHMMAction, DISPLAY_HH_MM};
-FSM_TRANSITION timeSetHrToMin               = {SET_TIME_MODE_HR,    setPressed,         noAction, SET_TIME_MODE_MIN};
-FSM_TRANSITION timeSetHrIncrement           = {SET_TIME_MODE_HR,    incrementPressed,   incrementHour, SET_TIME_MODE_HR};
-FSM_TRANSITION timeSetHrDecrement           = {SET_TIME_MODE_HR,    decrementPressed,   decrementHour, SET_TIME_MODE_HR};
-FSM_TRANSITION timeSetMinToHr               = {SET_TIME_MODE_MIN,   setPressed,         noAction, DISPLAY_HH_MM};
-FSM_TRANSITION timeSetMinIncrement          = {SET_TIME_MODE_MIN,   incrementPressed,   incrementMinute, SET_TIME_MODE_MIN};
-FSM_TRANSITION timeSetMinDecrement          = {SET_TIME_MODE_MIN,   decrementPressed,   decrementMinute, SET_TIME_MODE_MIN};
-
-/// Finite State Machine
-
+/// Display Functions
 uint8_t currentState = 0;
-
 bool transitioned = false;
 uint8_t matches = 0;
 bool triggered = false;
-void displayCurrentState()
+
+void displayFunctionCurrentState()
 {
     displayData.data[3] = mapChar(currentState);    //Far Right -> Current State Index
     displayData.data[2] = mapChar(triggered ? 9 : 0); //Center Right -> 9 if triggered, 0 if not.
@@ -404,12 +391,17 @@ void displayCurrentState()
     displayData.data[0] = mapChar(transitioned);    //Far Left -> FSM has transitioned.
 }
 
+volatile uint32_t adcValue = 0;
 
-void displayTime()
+void displayFunctionADCValue() {
+    displayData.data[3] = mapChar(adcValue & 0x0F);
+    displayData.data[2] = mapChar((adcValue >> 4) & 0x0F);
+    displayData.data[1] = mapChar((adcValue >> 8) & 0x0F);
+    displayData.data[0] = mapChar((adcValue >> 12) & 0x0F);
+}
+
+void displayFunctionTimeHHMM()
 {
-    uint8_t sl = clock.seconds % 10;
-    uint8_t sh = clock.seconds / 10;
-
     uint8_t ml = clock.minutes % 10;
     uint8_t mh = clock.minutes / 10;
 
@@ -422,18 +414,10 @@ void displayTime()
     uint8_t hl = hours % 10;
     uint8_t hh = hours / 10;
 
-
-    if (timeDisplayMode == HHMM) {
-        displayData.data[3] = mapChar(ml);  //Far Right
-        displayData.data[2] = mapChar(mh);  //Centre Right
-        displayData.data[1] = mapChar(hl);  //Center Left
-        displayData.data[0] = mapChar(hh);  //Far Left
-    } else {
-        displayData.data[3] = mapChar(sl);  //Far Right
-        displayData.data[2] = mapChar(sh);  //Centre Right
-        displayData.data[1] = mapChar(ml);  //Center Left
-        displayData.data[0] = mapChar(mh);  //Far Left
-    }
+    displayData.data[3] = mapChar(ml);  //Far Right
+    displayData.data[2] = mapChar(mh);  //Centre Right
+    displayData.data[1] = mapChar(hl);  //Center Left
+    displayData.data[0] = mapChar(hh);  //Far Left
 
     // Decimal Point
     //Must show constantly when in MMSS state. Currently does not.
@@ -443,13 +427,91 @@ void displayTime()
     displayData.data[3] &= (timeMode == TWELVE_HOUR_TIME && clock.hours > 12 ? mapChar(DP) : mapChar(BLANK));
 }
 
+void displayFunctionTimeMMSS()
+{
+    uint8_t sl = clock.seconds % 10;
+    uint8_t sh = clock.seconds / 10;
+
+    uint8_t ml = clock.minutes % 10;
+    uint8_t mh = clock.minutes / 10;
+
+    displayData.data[3] = mapChar(sl);  //Far Right
+    displayData.data[2] = mapChar(sh);  //Centre Right
+    displayData.data[1] = mapChar(ml);  //Center Left
+    displayData.data[0] = mapChar(mh);  //Far Left
+
+    // Decimal Point
+    //Must show constantly when in MMSS state. Currently does not.
+    displayData.data[1] &= mapChar(DP);
+
+    // PM Indicator
+    displayData.data[3] &= (timeMode == TWELVE_HOUR_TIME && clock.hours > 12 ? mapChar(DP) : mapChar(BLANK));
+}
+
+void displayFunctionSetTimeHH()
+{
+    uint8_t hours = clock.hours;
+
+    if (timeMode == TWELVE_HOUR_TIME && hours > 12) {
+        hours -= 12;
+    }
+
+    uint8_t hl = hours % 10;
+    uint8_t hh = hours / 10;
+
+    displayData.data[3] = mapChar(BLANK);   //Far Right
+    displayData.data[2] = mapChar(BLANK);   //Centre Right
+    displayData.data[1] = mapChar(hl);      //Center Left
+    displayData.data[0] = mapChar(hh);      //Far Left
+
+    //PM Indicator
+    displayData.data[3] &= (timeMode == TWELVE_HOUR_TIME && clock.hours > 12 ? mapChar(DP) : mapChar(BLANK));
+}
+
+void displayFunctionTimeMM()
+{
+    uint8_t ml = clock.minutes % 10;
+    uint8_t mh = clock.minutes / 10;
+
+    displayData.data[3] = mapChar(ml);  //Far Right
+    displayData.data[2] = mapChar(mh);  //Centre Right
+    displayData.data[1] = mapChar(BLANK);  //Center Left
+    displayData.data[0] = mapChar(BLANK);  //Far Left
+}
+
+void resetSeconds() {
+    clock.seconds = 0;
+}
+
+/// Display Functions
+
+/// Finite State Machine
+
+FSM_TRANSITION displayHoursToDisplayMinutes = {DISPLAY_HH_MM,       displayPressed,     displayMMSSAction,  DISPLAY_MM_SS,    };
+FSM_TRANSITION displayHoursToSetTime        = {DISPLAY_HH_MM,       setPressed,         noAction,           SET_TIME_MODE_HR  };
+FSM_TRANSITION displayMinutesToDisplayHours = {DISPLAY_MM_SS,       displayPressed,     displayHHMMAction,  DISPLAY_HH_MM     };
+FSM_TRANSITION timeSetHrToMin               = {SET_TIME_MODE_HR,    setPressed,         noAction,           SET_TIME_MODE_MIN };
+FSM_TRANSITION timeSetHrIncrement           = {SET_TIME_MODE_HR,    incrementPressed,   incrementHour,      SET_TIME_MODE_HR  };
+FSM_TRANSITION timeSetHrDecrement           = {SET_TIME_MODE_HR,    decrementPressed,   decrementHour,      SET_TIME_MODE_HR  };
+FSM_TRANSITION timeSetMinToDisplayHr        = {SET_TIME_MODE_MIN,   setPressed,         resetSeconds,       DISPLAY_HH_MM     };
+FSM_TRANSITION timeSetMinIncrement          = {SET_TIME_MODE_MIN,   incrementPressed,   incrementMinute,    SET_TIME_MODE_MIN };
+FSM_TRANSITION timeSetMinDecrement          = {SET_TIME_MODE_MIN,   decrementPressed,   decrementMinute,    SET_TIME_MODE_MIN };
+
+/// Finite State Machine
+
+
 volatile bool buttonInterruptTriggered = false;
 
-bool buttonTimingCorrect(Button *btn) {
+bool buttonTimingCorrect(volatile Button *btn) {
+    if (!btn)
+        return false;
+
     return currentTimeMilliseconds - btn->lastActionTime > BUTTON_CHANGE_DELAY_MS;
 }
 
-void updateButton(Button* btn) {
+void updateButton(volatile Button* btn) {
+    if (!btn)
+        return;
 
     // If the button was last considered released and is now pressed.
     if (btn->currentState == RELEASED && isPressed(btn->buttonPin, BUTTON_IN) && buttonTimingCorrect(btn))
@@ -497,8 +559,19 @@ void fsmTransitionCallback(TransitionCallback result) {
         case NOT_TRIGGERED:
             triggered = true;
             break;
+        case TRIGGERED:
+            break;
+        case ACTION:
+            break;
         }
 }
+
+volatile bool shouldUpdateDisplay = false;
+FSM_TRANSITION_TABLE *stateMachinePtr = 0;
+
+DisplayFunctionPointer displayFunctions[FSM_STATE_COUNT] = {displayFunctionTimeHHMM, displayFunctionTimeMMSS, displayFunctionSetTimeHH, displayFunctionTimeMM};
+
+// #define OVERRIDE_DISPLAY_FUNCTION
 
 int main()
 {
@@ -515,10 +588,15 @@ int main()
                                                             timeSetHrToMin,
                                                             timeSetHrIncrement,
                                                             timeSetHrDecrement,
-                                                            timeSetMinToHr,
+                                                            timeSetMinToDisplayHr,
                                                             timeSetMinIncrement,
                                                             timeSetMinDecrement}};
-    displaySetData = displayTime;
+    stateMachinePtr = &stateMachine;
+
+    #ifdef OVERRIDE_DISPLAY_FUNCTION
+        displayFunction = displayFunctionTimeHHMM;
+        // displayFunction = displayFunctionADCValue;
+    #endif
 
     while (1)
     {
@@ -531,6 +609,18 @@ int main()
         }
 
         FSMUpdate(&stateMachine, fsmTransitionCallback);
+
+        #ifndef OVERRIDE_DISPLAY_FUNCTION
+            displayFunction = displayFunctions[stateMachine.currentState];
+        #endif
+
+        if (shouldUpdateDisplay) {
+            shouldUpdateDisplay = false;
+            if (displayFunction)
+                displayFunction();
+
+            displayUpdate(displayData);
+        }
     }
 
     return 0;
@@ -539,44 +629,31 @@ int main()
 ISR(TIMER1_COMPA_vect)
 {
     static uint8_t tick;
-    tick++;
 
     withDp = (tick == 1);
+
+    tick++;
+
 
     if (tick == 2)
     {
         //secondsElasped++;
-        addSecond(&clock);
+        addSeconds(&clock, 1);
         tick = 0;
     }
     //Add 500 milliseconds - any millis already accounted for previously to the system counter.
     addMillisecondsToSystemCounter(500 - millisAccountedBetweenTicks);
 }
 
-volatile uint32_t adcValue = 0;
-
 ISR(TIMER0_COMPA_vect)
 {
-    displaySetData();
-
-    displayUpdate(displayData);
+    shouldUpdateDisplay = true;
 }
 
-// ADC/potentiometer has an issue where if it reaches 0x03 it cannot be raised again. 
-// So I wont allow it to go below 0x4.
-#define ADC_LOWER_BUG_LIMIT 0x4
 ISR(ADC_vect)
 {
     // Set timer output compare to ADC value
-    OCR0A = ADCH;
-
-    if (OCR0A < ADC_LOWER_BUG_LIMIT)
-    {
-        OCR0A = ADC_LOWER_BUG_LIMIT;
-    }
-
-    adcValue = OCR0A;
-    PORTB ^= ~(1 << PB4);
+    adcValue = OCR0A = ADCH;
 }
 
 /**
@@ -586,5 +663,4 @@ ISR(ADC_vect)
 ISR(PCINT1_vect) {
     if (BUTTON_IN)
         buttonInterruptTriggered = true;
-
 }

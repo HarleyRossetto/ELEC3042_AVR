@@ -7,6 +7,7 @@
 typedef bool (*FSM_TRIGGER)();
 typedef void (*FSM_ACTION)();
 
+#define FSM_STATE_COUNT 4
 typedef enum FSM_STATES
 {
     DISPLAY_HH_MM, DISPLAY_MM_SS, SET_TIME_MODE_HR, SET_TIME_MODE_MIN
@@ -19,7 +20,6 @@ typedef struct FSM_TRANS
     FSM_ACTION action;
     FSM_STATE nextState;
 } FSM_TRANSITION;
-
 
 #define FSM_TRANSITION_MAX 9
 typedef struct FSM_TRANS_TBL

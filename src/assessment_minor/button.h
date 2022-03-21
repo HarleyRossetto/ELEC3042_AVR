@@ -6,7 +6,7 @@ typedef enum
     NONE, PRESSED, RELEASED, HELD
 } ButtonState;
 
-#define BUTTON_CHANGE_DELAY_MS 15
+#define BUTTON_CHANGE_DELAY_MS 30
 
 typedef struct {
     ButtonState currentState;

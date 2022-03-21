@@ -1,7 +1,11 @@
 #include "clock.h"
 
-void validateTime(Time *time) {
-    if (time->seconds == 60) {
+void validateTime(volatile Time *time) {
+    if (!time)
+        return;
+
+    if (time->seconds == 60)
+    {
         time->minutes++;
         time->seconds = 0;
     }
@@ -16,7 +20,10 @@ void validateTime(Time *time) {
     }
 }
 
-void addTime(Time *target, uint8_t hours, uint8_t minutes, uint8_t seconds) {
+void addTime(volatile Time *target, uint8_t hours, uint8_t minutes, uint8_t seconds) {
+    if (!target)
+        return;
+
     target->seconds += seconds;
     target->minutes += minutes;
     target->hours += hours;
@@ -24,14 +31,14 @@ void addTime(Time *target, uint8_t hours, uint8_t minutes, uint8_t seconds) {
     validateTime(target);
 }
 
-void addSeconds(Time *target, uint8_t seconds) {
+void addSeconds(volatile Time *target, uint8_t seconds) {
     addTime(target, 0, 0, seconds);
 }
 
-void addMinutes(Time *target, uint8_t minutes) {
+void addMinutes(volatile Time *target, uint8_t minutes) {
     addTime(target, 0, minutes, 0);
 }
 
-void addHours(Time *target, uint8_t hours) {
+void addHours(volatile Time *target, uint8_t hours) {
     addTime(target, hours, 0, 0);
 }
