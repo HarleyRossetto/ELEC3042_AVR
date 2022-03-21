@@ -10,3 +10,5 @@ include(src/week3/w3p1/CMakeLists.txt)
 include(src/week4/p1/CMakeLists.txt)
 include(src/week4/p2/CMakeLists.txt)
 include(src/week4/p3/CMakeLists.txt)
+
+include(src/spi/CMakeLists.txt)
