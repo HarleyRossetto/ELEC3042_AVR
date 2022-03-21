@@ -5,6 +5,8 @@
 #include "display.h"
 #include "fsm.h"
 #include "timers.h"
+#include "button.h"
+#include "clock.h"
 
 /// TIMING
 
@@ -21,13 +23,8 @@ void enableTimers()
     enableTimer(TC0, CLOCK_SELECT_1024_PRESCALER);
 }
 
-struct Time {
-    uint8_t hours;
-    uint8_t minutes;
-    uint8_t seconds;
-};
+Time clock;
 
-struct Time clock;
 typedef enum
 {
     TWELVE_HOUR_TIME,
@@ -44,69 +41,10 @@ typedef enum
 
 TimeDisplayMode timeDisplayMode = HHMM;
 
-void validateClock(struct Time *clock) {
-    if (clock->seconds == 60) {
-        clock->minutes++;
-        clock->seconds = 0;
-    }
-    if (clock->minutes == 60) {
-        clock->hours++;
-        clock->minutes = 0;
-    }
-    if (clock->hours == 24) {
-        clock->hours = 0;
-        clock->minutes = 0;
-        clock->seconds = 0;
-    }
-}
-
-void addSecond(struct Time* clock) {
-    clock->seconds++;
-
-    validateClock(clock);
-}
-
-void addMinute(struct Time* clock) {
-    clock->minutes++;
-    validateClock(clock);
-}
-
-void removeMinute(struct Time *clock) {
-    clock->minutes--;
-    validateClock(clock);
-}
-
-void addHour(struct Time* clock) {
-    clock->hours++;
-    validateClock(clock);
-}
-
-void removeHour(struct Time *clock) {
-    clock->hours--;
-    validateClock(clock);
-}
-
 /// TIMING
 
 
 /// BUTTONS
-
-typedef enum
-{
-    NONE, PRESSED, RELEASED, HELD
-} ButtonState;
-
-#define BUTTON_CHANGE_DELAY_MS 15
-
-typedef struct {
-    ButtonState currentState;
-    ButtonState actionState;
-    uint64_t lastActionTime;
-    uint8_t buttonPin;
-    void(*eventPress)();
-    void(*eventRelease)();
-    bool updated;
-} Button;
 
 void buttonPress(Button* btn) {
     btn->currentState = PRESSED;
@@ -413,22 +351,22 @@ bool decrementPressed()
 
 void incrementHour()
 {
-    addHour(&clock);
+    addHours(&clock, 1);
 }
 
 void decrementHour()
 {
-    removeHour(&clock);
+    addHours(&clock, -1);
 }
 
 void incrementMinute()
 {
-    addMinute(&clock);
+    addMinutes(&clock, 1);
 }
 
 void decrementMinute()
 {
-    removeMinute(&clock);
+    addMinutes(&clock, -1);
 }
 
 void displayHHMMAction() {
@@ -638,6 +576,7 @@ ISR(ADC_vect)
     }
 
     adcValue = OCR0A;
+    PORTB ^= ~(1 << PB4);
 }
 
 /**

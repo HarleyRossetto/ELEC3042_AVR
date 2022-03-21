@@ -16,7 +16,10 @@ set(SOURCES
         "src/${TARGET}/fsm.c"
         "src/${TARGET}/bool.h"
         "src/${TARGET}/timers.h"
-        "src/${TARGET}/display.h")
+        "src/${TARGET}/display.h"
+        "src/${TARGET}/button.h"
+        "src/${TARGET}/clock.h"
+        "src/${TARGET}/clock.c")
 
 ####################################################################################################
 
