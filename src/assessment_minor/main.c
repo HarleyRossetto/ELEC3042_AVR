@@ -14,12 +14,13 @@ volatile uint64_t currentTimeMilliseconds = 0;
 volatile uint16_t millisAccountedBetweenTicks;
 #define addMillisecondsToSystemCounter(millis) currentTimeMilliseconds += millis;
 
-#define TIMER1_TICKS_PER_SECOND_1024 15625
+#define TIMER1_TICKS_PER_SECOND_256 62500
+#define TIMER1_TICKS_PER_100_MILLIS_256PRESCALE TIMER1_TICKS_PER_SECOND_256 / 10
 
 void enableTimers()
 {
     // Primary second counter
-    enableTimer(TC1, CLOCK_SELECT_1024_PRESCALER);
+    enableTimer(TC1, CLOCK_SELECT_256_PRESCALER);
     enableTimer(TC0, CLOCK_SELECT_1024_PRESCALER);
 }
 
@@ -207,6 +208,8 @@ volatile bool withDp = false;
  *          NOTE: This does not start the timer, enableTimer(TC1, PRESCALER);
  * must be called to do so.
  *
+ * Timer 1 will run with a 100ms period using a 256 prescaler. With this configuration no 
+ * compensation is required because there are no fractions involved in compare counts.
  */
 void initialiseTimer1()
 {
@@ -221,7 +224,7 @@ void initialiseTimer1()
     TCNT1 = 0;
 
     // Output Compare Register A
-    OCR1A = TIMER1_TICKS_PER_SECOND_1024 / 2;
+    OCR1A = TIMER1_TICKS_PER_100_MILLIS_256PRESCALE;
     // Output Compare Register B
     OCR1B = 0;
 
@@ -517,7 +520,7 @@ void updateButton(volatile Button* btn) {
     if (btn->currentState == RELEASED && isPressed(btn->buttonPin, BUTTON_IN) && buttonTimingCorrect(btn))
     {
          //Calculate milliseconds elasped since last clock call.
-        uint16_t  millisElaspedAtInterruptCall = (TCNT1 * 500 / (TIMER1_TICKS_PER_SECOND_1024 / 2));
+        uint16_t  millisElaspedAtInterruptCall = (TCNT1 * 100 / TIMER1_TICKS_PER_100_MILLIS_256PRESCALE);
         addMillisecondsToSystemCounter(millisElaspedAtInterruptCall);
 
         buttonPress(btn);
@@ -529,7 +532,7 @@ void updateButton(volatile Button* btn) {
     else if (btn->currentState == PRESSED && !isPressed(btn->buttonPin, BUTTON_IN) && buttonTimingCorrect(btn)) 
     {
          //Calculate milliseconds elasped since last clock call.
-        uint16_t  millisElaspedAtInterruptCall = (TCNT1 * 500 / (TIMER1_TICKS_PER_SECOND_1024 / 2));
+        uint16_t  millisElaspedAtInterruptCall = (TCNT1 * 100 / TIMER1_TICKS_PER_100_MILLIS_256PRESCALE);
         addMillisecondsToSystemCounter(millisElaspedAtInterruptCall);
 
         buttonRelease(btn);
@@ -630,19 +633,18 @@ ISR(TIMER1_COMPA_vect)
 {
     static uint8_t tick;
 
-    withDp = (tick == 1);
+    withDp = (tick > 5);
 
     tick++;
 
 
-    if (tick == 2)
-    {
+    if (tick > 9) {
         //secondsElasped++;
         addSeconds(&clock, 1);
         tick = 0;
     }
-    //Add 500 milliseconds - any millis already accounted for previously to the system counter.
-    addMillisecondsToSystemCounter(500 - millisAccountedBetweenTicks);
+    //Add 40 milliseconds - any millis already accounted for previously to the system counter.
+    addMillisecondsToSystemCounter(100 - millisAccountedBetweenTicks);
 }
 
 ISR(TIMER0_COMPA_vect)
