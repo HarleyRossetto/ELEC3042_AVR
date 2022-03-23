@@ -590,11 +590,15 @@ int main()
     {
         currentState = stateMachine.currentState;
 
+        /* Moved to PCINT1 interrupt vector.
+
         if (buttonInterruptTriggered) {
             buttonInterruptTriggered = false;
 
             updateAllButtons();
         }
+
+        */
 
         FSMUpdate(&stateMachine, fsmTransitionCallback);
 
@@ -649,5 +653,6 @@ ISR(ADC_vect)
  */
 ISR(PCINT1_vect) {
     if (BUTTON_IN)
-        buttonInterruptTriggered = true;
+         updateAllButtons();
+        // buttonInterruptTriggered = true;
 }
