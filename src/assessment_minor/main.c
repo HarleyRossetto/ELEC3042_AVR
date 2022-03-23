@@ -34,14 +34,6 @@ typedef enum
 
 TimeMode timeMode = TWELVE_HOUR_TIME;
 
-typedef enum
-{
-    HHMM,
-    MMSS
-} TimeDisplayMode;
-
-TimeDisplayMode timeDisplayMode = HHMM;
-
 /// TIMING
 
 
@@ -313,6 +305,7 @@ int initialise()
     initialiseTimer0();
     initialiseADC();
 
+    // Initialise LEDS and set inital values.
     DDRB  |= (1 << PB5) | (1 << PB4) | (1 << PB3) | (1 << PB2);
     PORTB |= (1 << PB5) | (1 << PB4) | (1 << PB3) | (1 << PB2);
 
@@ -370,14 +363,6 @@ void incrementMinute()
 void decrementMinute()
 {
     addMinutes(&clock, -1);
-}
-
-void displayHHMMAction() {
-    timeDisplayMode = HHMM;
-}
-
-void displayMMSSAction() {
-    timeDisplayMode = MMSS;
 }
 
 /// Display Functions
@@ -490,9 +475,9 @@ void resetSeconds() {
 
 /// Finite State Machine
 
-FSM_TRANSITION displayHoursToDisplayMinutes = {DISPLAY_HH_MM,       displayPressed,     displayMMSSAction,  DISPLAY_MM_SS,    };
+FSM_TRANSITION displayHoursToDisplayMinutes = {DISPLAY_HH_MM,       displayPressed,     noAction,           DISPLAY_MM_SS,    };
 FSM_TRANSITION displayHoursToSetTime        = {DISPLAY_HH_MM,       setPressed,         noAction,           SET_TIME_MODE_HR  };
-FSM_TRANSITION displayMinutesToDisplayHours = {DISPLAY_MM_SS,       displayPressed,     displayHHMMAction,  DISPLAY_HH_MM     };
+FSM_TRANSITION displayMinutesToDisplayHours = {DISPLAY_MM_SS,       displayPressed,     noAction,           DISPLAY_HH_MM     };
 FSM_TRANSITION timeSetHrToMin               = {SET_TIME_MODE_HR,    setPressed,         noAction,           SET_TIME_MODE_MIN };
 FSM_TRANSITION timeSetHrIncrement           = {SET_TIME_MODE_HR,    incrementPressed,   incrementHour,      SET_TIME_MODE_HR  };
 FSM_TRANSITION timeSetHrDecrement           = {SET_TIME_MODE_HR,    decrementPressed,   decrementHour,      SET_TIME_MODE_HR  };
