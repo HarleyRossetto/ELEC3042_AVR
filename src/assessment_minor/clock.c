@@ -38,6 +38,8 @@ void validateTime(volatile Time *time) {
  * @param hours Hours to add to the time.
  * @param minutes Minutes to add to the time.
  * @param seconds Seconds to add to the time.
+ * 
+ * @todo Needs to be validated itself, maths appears to be off when subtacting values.
  */
 void addTime(volatile Time *target, int8_t hours, int8_t minutes, int8_t seconds) {
     if (!target)
