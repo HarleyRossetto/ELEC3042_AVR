@@ -9,23 +9,35 @@ void validateTime(volatile Time *time) {
     if (!time)
         return;
 
-    if (time->seconds == 60) {
+    // Add minute, set seconds to 0
+    if (time->seconds == 60) {          
         time->minutes++;
         time->seconds = 0;
-    } else if (time->seconds > 60) {
+    } 
+    // Because we are using unsigned values for s/m/h when 'decrementing' the value should overflow (i.e. = 255)
+    // Thus if this happens then flip value back to its maximum before an overflow occurs.
+    else if (time->seconds > 60) {   
         time->seconds = 59;
     }
+    // Add hour, set minutes to 0.
     if (time->minutes == 60) {
         time->hours++;
         time->minutes = 0;
-    } else if (time->minutes > 60) {
+    } 
+    // Because we are using unsigned values for s/m/h when 'decrementing' the value should overflow (i.e. = 255)
+    // Thus if this happens then flip value back to its maximum before an overflow occurs.
+    else if (time->minutes > 60) {
         time->minutes = 59;
     }
+    // New day, set all to 0.
     if (time->hours == 24) {
         time->hours = 0;
         time->minutes = 0;
         time->seconds = 0;
-    } else if (time->hours > 24) {
+    } 
+    // Because we are using unsigned values for s/m/h when 'decrementing' the value should overflow (i.e. = 255)
+    // Thus if this happens then flip value back to its maximum before an overflow occurs.
+    else if (time->hours > 24) {
         time->hours = 23;
     }
 }
@@ -45,19 +57,33 @@ void addTime(volatile Time *target, int8_t hours, int8_t minutes, int8_t seconds
     if (!target)
         return;
 
-    // Handle parameter overflows.
-    minutes += seconds / 60;    // How many minutes represented in second value.
-    seconds %= 60;              // Remainder of seconds after removal of minutes.
-    hours += minutes / 60;      // How many hours represented in minute value.
-    minutes %= 60;              // Remainder of minutes after removal of hours
+    // uint16_t accumulatedSeconds = target->seconds + seconds;
+    // uint16_t accumulatedMinutes = target->minutes + minutes + accumulatedSeconds / 60;
+    // uint16_t accumulatedHours   = target->hours   + hours   + accumulatedMinutes / 60;
 
-    uint8_t accSeconds = target->seconds + seconds;                     // Target seconds + input seconds
-    uint8_t accMinutes = target->minutes + minutes + accSeconds / 60;   // Target minutes + input minutes + minutes from seconds
-    uint8_t accHours = target->hours + hours + accMinutes / 60;         // Target hours + input hours + hours from minutes
+    // target->seconds = accumulatedSeconds % 60;
+    // target->minutes = accumulatedMinutes % 60;
+    // target->hours = accumulatedHours % 24;
 
-    target->seconds = accSeconds % 60;
-    target->minutes = accMinutes % 60;
-    target->hours = accHours % 24;
+    /*
+        // Handle parameter overflows.
+        minutes += seconds / 60;    // How many minutes represented in second value.
+        seconds %= 60;              // Remainder of seconds after removal of minutes.
+        hours += minutes / 60;      // How many hours represented in minute value.
+        minutes %= 60;              // Remainder of minutes after removal of hours
+
+        uint8_t accSeconds = target->seconds + seconds;                     // Target seconds + input seconds
+        uint8_t accMinutes = target->minutes + minutes + accSeconds / 60;   // Target minutes + input minutes + minutes from seconds
+        uint8_t accHours = target->hours + hours + accMinutes / 60;         // Target hours + input hours + hours from minutes
+
+        target->seconds = accSeconds % 60;
+        target->minutes = accMinutes % 60;
+        target->hours = accHours % 24;
+        */
+
+    target->seconds += seconds;
+    target->minutes += minutes;
+    target->hours += hours;
 
     validateTime(target);
 }
