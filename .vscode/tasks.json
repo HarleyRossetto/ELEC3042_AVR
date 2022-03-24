@@ -76,8 +76,9 @@
                 "w4p1",
                 "w4p2",
                 "w4p3",
+                "w5p1"
             ],
-            "default": "assessment_minor"
+            "default": "w5p1"
         }
     ]
 }
