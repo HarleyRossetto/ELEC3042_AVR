@@ -7,12 +7,13 @@
 #include "timers.h"
 #include "button.h"
 #include "clock.h"
+#include "systemtimer.h"
 
 /// TIMING
 
-volatile uint64_t currentTimeMilliseconds = 0;
-volatile uint16_t millisAccountedBetweenTicks;
-#define addMillisecondsToSystemCounter(millis) currentTimeMilliseconds += millis;
+// volatile uint64_t currentTimeMilliseconds = 0;
+// volatile uint16_t millisAccountedBetweenTicks;
+// #define addMillisecondsToSystemCounter(millis) currentTimeMilliseconds += millis;
 
 #define TIMER1_TICKS_PER_SECOND_256 62500
 #define TIMER1_TICKS_PER_100_MILLIS_256PRESCALE TIMER1_TICKS_PER_SECOND_256 / 10
@@ -36,26 +37,9 @@ TimeMode timeMode = TWELVE_HOUR_TIME;
 
 /// TIMING
 
-
 /// BUTTONS
 
-void buttonPress(volatile Button* btn) {
-    btn->currentState = PRESSED;
-    btn->actionState = PRESSED;
-    btn->updated = true;
-}
 
-void buttonRelease(volatile Button* btn) {
-    btn->currentState = RELEASED;
-    btn->actionState = RELEASED;
-    btn->updated = true;
-}
-
-ButtonState buttonReadActionState(volatile Button *btn) {
-    ButtonState result = btn->actionState;
-    btn->actionState = NONE;
-    return result;
-}
 
 bool buttonHasUpdate(volatile Button *btn) {
     bool result = btn->updated;
@@ -116,9 +100,9 @@ void dec_Released() {
 #define BUTTON_DDR DDRC
 #define BUTTON_IN PINC
 
-volatile Button buttonSet = {RELEASED, NONE, 0, BUTTON_SET, set_Pressed, set_Released, false};
-volatile Button buttonInc = {RELEASED, NONE, 0, BUTTON_INCREMENT, inc_Pressed, inc_Released, false};
-volatile Button buttonDec = {RELEASED, NONE, 0, BUTTON_DECREMENT, dec_Pressed, dec_Released, false};
+volatile Button buttonSet = {RELEASED, 0, BUTTON_SET,       set_Pressed, set_Released, false, &BUTTON_IN};
+volatile Button buttonInc = {RELEASED, 0, BUTTON_INCREMENT, inc_Pressed, inc_Released, false, &BUTTON_IN};
+volatile Button buttonDec = {RELEASED, 0, BUTTON_DECREMENT, dec_Pressed, dec_Released, false, &BUTTON_IN};
 
 #define BUTTON_COUNT 3
 volatile Button buttons[BUTTON_COUNT];
@@ -128,8 +112,6 @@ bool setPressed();
 bool incrementPressed();
 bool decrementPressed();
 
-#define getButtonState(buttonPin, buttonInput) (buttonInput & (1 << buttonPin) ? RELEASED : PRESSED)
-#define isPressed(buttonPin, buttonInput) !(buttonInput & (1 << buttonPin))
 /// BUTTONS
 
 /// DISPLAY
@@ -295,6 +277,8 @@ void initialiseButtons() {
     buttons[0] = buttonSet;
     buttons[1] = buttonInc;
     buttons[2] = buttonDec;
+
+    setTiming(&TCNT1, TIMER1_TICKS_PER_100_MILLIS_256PRESCALE);
 }
 
 int initialise()
@@ -467,6 +451,13 @@ void displayFunctionTimeMM()
     displayData.data[0] = mapChar(BLANK);  //Far Left
 }
 
+void displayFunctionBlank() {
+    displayData.data[3] = mapChar(BLANK);   //Far Right
+    displayData.data[2] = mapChar(BLANK);   //Centre Right
+    displayData.data[1] = mapChar(BLANK);      //Center Left
+    displayData.data[0] = mapChar(BLANK);      //Far Left
+}
+
 void resetSeconds() {
     clock.seconds = 0;
 }
@@ -490,13 +481,9 @@ FSM_TRANSITION timeSetMinDecrement          = {SET_TIME_MODE_MIN,   decrementPre
 
 volatile bool buttonInterruptTriggered = false;
 
-bool buttonTimingCorrect(volatile Button *btn) {
-    if (!btn)
-        return false;
 
-    return currentTimeMilliseconds - btn->lastActionTime > BUTTON_CHANGE_DELAY_MS;
-}
 
+/*
 void updateButton(volatile Button* btn) {
     if (!btn)
         return;
@@ -526,6 +513,7 @@ void updateButton(volatile Button* btn) {
             btn->eventRelease();
     }
 }
+*/
 
 void updateAllButtons() {
     for (int i = 0; i < BUTTON_COUNT; i++) {
@@ -608,8 +596,13 @@ int main()
 
         if (shouldUpdateDisplay) {
             shouldUpdateDisplay = false;
-            if (displayFunction)
-                displayFunction();
+            //Need to turn of display
+            if (adcValue == 0xFF) {
+                displayFunctionBlank();
+            } else {
+                if (displayFunction)
+                   displayFunction();
+            }
 
             displayUpdate(displayData);
         }
@@ -632,8 +625,8 @@ ISR(TIMER1_COMPA_vect)
         addSeconds(&clock, 1);
         tick = 0;
     }
-    //Add 40 milliseconds - any millis already accounted for previously to the system counter.
-    addMillisecondsToSystemCounter(100 - millisAccountedBetweenTicks);
+    //Add 100 milliseconds - any millis already accounted for previously to the system counter.
+    addMillisToSystemCounter(100 - millisecondsHandledBetweenTicks);
 }
 
 ISR(TIMER0_COMPA_vect)

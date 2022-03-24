@@ -15,7 +15,8 @@
 		},
 		"files.associations": {
 			"stdint.h": "c",
-			"iom328p.h": "c"
+			"iom328p.h": "c",
+			"systemtimer.h": "c"
 		}
 	},
 	"extensions": {

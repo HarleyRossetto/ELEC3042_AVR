@@ -18,8 +18,12 @@ set(SOURCES
         "src/${TARGET}/timers.h"
         "src/${TARGET}/display.h"
         "src/${TARGET}/button.h"
+        "src/${TARGET}/button.c"
         "src/${TARGET}/clock.h"
-        "src/${TARGET}/clock.c")
+        "src/${TARGET}/clock.c"
+        "src/${TARGET}/systemtimer.h"
+        "src/${TARGET}/systemtimer.c"
+        "src/${TARGET}/eeprom.h")
 
 ####################################################################################################
 
