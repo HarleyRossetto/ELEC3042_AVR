@@ -466,6 +466,13 @@ void resetSeconds() {
 
 /// Finite State Machine
 
+/*
+    BUTTON/CHANGE STATE ERROR
+
+    i.e. when in MMSS mode, pressing SET raises SETPRESSED flag which isnt checked until return to HHMM state.
+    Will need to clear flag after x time.
+*/
+
 FSM_TRANSITION displayHoursToDisplayMinutes = {DISPLAY_HH_MM,       displayPressed,     noAction,           DISPLAY_MM_SS,    };
 FSM_TRANSITION displayHoursToSetTime        = {DISPLAY_HH_MM,       setPressed,         noAction,           SET_TIME_MODE_HR  };
 FSM_TRANSITION displayMinutesToDisplayHours = {DISPLAY_MM_SS,       displayPressed,     noAction,           DISPLAY_HH_MM     };
