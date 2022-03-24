@@ -481,40 +481,6 @@ FSM_TRANSITION timeSetMinDecrement          = {SET_TIME_MODE_MIN,   decrementPre
 
 volatile bool buttonInterruptTriggered = false;
 
-
-
-/*
-void updateButton(volatile Button* btn) {
-    if (!btn)
-        return;
-
-    // If the button was last considered released and is now pressed.
-    if (btn->currentState == RELEASED && isPressed(btn->buttonPin, BUTTON_IN) && buttonTimingCorrect(btn))
-    {
-         //Calculate milliseconds elasped since last clock call.
-        uint16_t  millisElaspedAtInterruptCall = (TCNT1 * 100 / TIMER1_TICKS_PER_100_MILLIS_256PRESCALE);
-        addMillisecondsToSystemCounter(millisElaspedAtInterruptCall);
-
-        buttonPress(btn);
-        // btn->currentState = PRESSED;
-        if (btn->eventPress)
-            btn->eventPress();
-    }
-    // Otherwise if button was last considered pressed and is now released.
-    else if (btn->currentState == PRESSED && !isPressed(btn->buttonPin, BUTTON_IN) && buttonTimingCorrect(btn)) 
-    {
-         //Calculate milliseconds elasped since last clock call.
-        uint16_t  millisElaspedAtInterruptCall = (TCNT1 * 100 / TIMER1_TICKS_PER_100_MILLIS_256PRESCALE);
-        addMillisecondsToSystemCounter(millisElaspedAtInterruptCall);
-
-        buttonRelease(btn);
-        // btn->currentState = RELEASED;
-        if (btn->eventRelease)
-            btn->eventRelease();
-    }
-}
-*/
-
 void updateAllButtons() {
     for (int i = 0; i < BUTTON_COUNT; i++) {
         updateButton(&buttons[i]);
@@ -578,16 +544,6 @@ int main()
     {
         currentState = stateMachine.currentState;
 
-        /* Moved to PCINT1 interrupt vector.
-
-        if (buttonInterruptTriggered) {
-            buttonInterruptTriggered = false;
-
-            updateAllButtons();
-        }
-
-        */
-
         FSMUpdate(&stateMachine, fsmTransitionCallback);
 
         #ifndef OVERRIDE_DISPLAY_FUNCTION
@@ -647,5 +603,4 @@ ISR(ADC_vect)
 ISR(PCINT1_vect) {
     if (BUTTON_IN)
          updateAllButtons();
-        // buttonInterruptTriggered = true;
 }
