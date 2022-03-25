@@ -23,7 +23,9 @@ set(SOURCES
         "src/${TARGET}/clock.c"
         "src/${TARGET}/systemtimer.h"
         "src/${TARGET}/systemtimer.c"
-        "src/${TARGET}/eeprom.h")
+        "src/${TARGET}/eeprom.h"
+        "src/${TARGET}/tickable.h"
+        "src/${TARGET}/tickable.c")
 
 ####################################################################################################
 

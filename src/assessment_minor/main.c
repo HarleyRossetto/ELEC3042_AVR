@@ -8,6 +8,7 @@
 #include "button.h"
 #include "clock.h"
 #include "systemtimer.h"
+#include "tickable.h"
 
 FSM_TRANSITION_TABLE *stateMachinePtr = 0;
 
@@ -170,7 +171,7 @@ void displayUpdate(DisplayData displayData)
 #define mapChar(c) SEGMENT_MAP[c]
 
 volatile bool updateTimeDisplay = false;
-volatile bool withDp = false;
+volatile bool withDp = true;
 
 /// DISPLAY
 
@@ -349,6 +350,16 @@ void decrementMinute()
     addMinutes(&clock, -1);
 }
 
+void incrementSecond()
+{
+    addSeconds(&clock, 1);
+}
+
+void decrementSecond()
+{
+    addSeconds(&clock, -1);
+}
+
 /// Display Functions
 bool transitioned = false;
 uint8_t matches = 0;
@@ -518,16 +529,16 @@ volatile bool shouldUpdateDisplay = false;
 
 DisplayFunctionPointer displayFunctions[FSM_STATE_COUNT] = {displayFunctionTimeHHMM, displayFunctionTimeMMSS, displayFunctionSetTimeHH, displayFunctionTimeMM};
 
+void toggleDecimalPlaceDisplay() {
+    withDp = !withDp;
+}
+
 // #define OVERRIDE_DISPLAY_FUNCTION
 
 int main()
 {
     if (!initialise())
         return -1;
-
-    enableTimers();
-
-    sei();
 
     FSM_TRANSITION_TABLE stateMachine = {DISPLAY_HH_MM, {   displayHoursToDisplayMinutes,
                                                             displayHoursToSetTime,
@@ -539,6 +550,17 @@ int main()
                                                             timeSetMinIncrement,
                                                             timeSetMinDecrement}};
     stateMachinePtr = &stateMachine;
+
+    //Create a tickable event which increments the minutes every 2 seconds.
+    TickableCreate(1000L, incrementMinute);
+    //Create a tickable event which increments the seconds, once every second.
+    TickableCreate(1000L, incrementSecond);
+    //Create a tickable even which toggle the decimal place display every 500ms.
+    TickableCreate(500L, toggleDecimalPlaceDisplay);
+
+    enableTimers();
+
+    sei();
 
     #ifdef OVERRIDE_DISPLAY_FUNCTION
         displayFunction = displayFunctionTimeHHMM;
@@ -577,18 +599,8 @@ int main()
 
 ISR(TIMER1_COMPA_vect)
 {
-    static uint8_t tick;
+    TickableUpdate(100L);
 
-    withDp = (tick > 5);
-
-    tick++;
-
-
-    if (tick > 9) {
-        //secondsElasped++;
-        addSeconds(&clock, 1);
-        tick = 0;
-    }
     //Add 100 milliseconds - any millis already accounted for previously to the system counter.
     addMillisToSystemCounter(100 - millisecondsHandledBetweenTicks);
 }
