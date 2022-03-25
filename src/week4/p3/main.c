@@ -102,7 +102,7 @@ typedef enum {
 
 int main(void) {
   setup(); // set up the physical hardware
-  int delay = 20;
+  int delay = 100;
 
   GameState state = Play;
 
