@@ -38,6 +38,12 @@ typedef enum
     MATCHES
 } TransitionCallbackReason;
 
+typedef enum
+{
+    NO_STATE_CHANGE,
+    STATE_CHANGE
+} FSMUpdateResult;
+
 typedef struct {
     TransitionCallbackReason reason;
     uint8_t data;
@@ -47,6 +53,6 @@ void
 noAction();
 bool noEvent();
 bool noContinue();
-void FSMUpdate(FSM_TRANSITION_TABLE *table, void (*transitionCallback)(TransitionCallback));
+FSMUpdateResult FSMUpdate(FSM_TRANSITION_TABLE *table);
 
 #endif

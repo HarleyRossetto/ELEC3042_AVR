@@ -9,6 +9,8 @@
 #include "clock.h"
 #include "systemtimer.h"
 
+FSM_TRANSITION_TABLE *stateMachinePtr = 0;
+
 /// TIMING
 
 // volatile uint64_t currentTimeMilliseconds = 0;
@@ -38,8 +40,6 @@ TimeMode timeMode = TWELVE_HOUR_TIME;
 /// TIMING
 
 /// BUTTONS
-
-
 
 bool buttonHasUpdate(volatile Button *btn) {
     bool result = btn->updated;
@@ -350,14 +350,13 @@ void decrementMinute()
 }
 
 /// Display Functions
-uint8_t currentState = 0;
 bool transitioned = false;
 uint8_t matches = 0;
 bool triggered = false;
 
 void displayFunctionCurrentState()
 {
-    displayData.data[3] = mapChar(currentState);    //Far Right -> Current State Index
+    displayData.data[3] = mapChar(stateMachinePtr->currentState);    //Far Right -> Current State Index
     displayData.data[2] = mapChar(triggered ? 9 : 0); //Center Right -> 9 if triggered, 0 if not.
     displayData.data[1] = mapChar(matches);         //Centre Left -> FSM Matches for current state.
     displayData.data[0] = mapChar(transitioned);    //Far Left -> FSM has transitioned.
@@ -516,7 +515,6 @@ void fsmTransitionCallback(TransitionCallback result) {
 }
 
 volatile bool shouldUpdateDisplay = false;
-FSM_TRANSITION_TABLE *stateMachinePtr = 0;
 
 DisplayFunctionPointer displayFunctions[FSM_STATE_COUNT] = {displayFunctionTimeHHMM, displayFunctionTimeMMSS, displayFunctionSetTimeHH, displayFunctionTimeMM};
 
@@ -549,9 +547,12 @@ int main()
 
     while (1)
     {
-        currentState = stateMachine.currentState;
-
-        FSMUpdate(&stateMachine, fsmTransitionCallback);
+        //Clear all button inputs flags on major state change.
+        if (FSMUpdate(&stateMachine) == STATE_CHANGE) {
+            setButtonPressed = false;
+            incrementButtonPressed = false;
+            decrementButtonPressed = false;
+        }
 
         #ifndef OVERRIDE_DISPLAY_FUNCTION
             displayFunction = displayFunctions[stateMachine.currentState];

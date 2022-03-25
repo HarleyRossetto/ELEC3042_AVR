@@ -2,9 +2,9 @@
 
 // Maybe put into a fsm.c file. This implementation is generic enough that we dont
 // need it specified here.
-void FSMUpdate(FSM_TRANSITION_TABLE *table, void (*callback)(TransitionCallback))
+FSMUpdateResult FSMUpdate(FSM_TRANSITION_TABLE *table)
 {
-    uint8_t matchesFound = 0;
+    FSMUpdateResult updateResult = NO_STATE_CHANGE;
     /**
      * Iterate overall potential transitions.
      * If any transition matches the current state, check its trigger(s).
@@ -17,25 +17,17 @@ void FSMUpdate(FSM_TRANSITION_TABLE *table, void (*callback)(TransitionCallback)
 
         if (transition.currentState == table->currentState)
         {
-            matchesFound++;
             if (transition.trigger())
             {
                 transition.action();
                 table->currentState = transition.nextState;
-                
-                TransitionCallback response = {TRANSITIONED, table->currentState};
-                callback(response);
-                
+                updateResult = STATE_CHANGE;
                 break;
-            } else {
-                TransitionCallback response = {NOT_TRIGGERED, 0};
-                callback(response);
             }
         }
     }
 
-    TransitionCallback response = {matchesFound ? MATCHES : NO_MATCH, matchesFound};
-    callback(response);
+    return updateResult;
 }
 
 void noAction() {}
