@@ -6,6 +6,7 @@
 #include "systemtimer.h"
 #include "avr/io.h"
 
+#define MAX_BUTTONS 3
 typedef enum
 {
     NONE, PRESSED, RELEASED, HELD

@@ -28,7 +28,7 @@ void TickableUpdate(uint64_t delta) {
         Tickable *t = &tickables[i];
         if (t->enabled) {
             t->elaspedTime += delta;
-    
+
             if (t->elaspedTime >= t->period) {
                 t->eventCallback();
                 t->elaspedTime = 0;
@@ -40,6 +40,4 @@ void TickableUpdate(uint64_t delta) {
     }
 }
 
-inline Tickable* TickableList() {
-    return tickables;
-}
+inline Tickable *TickableList() { return tickables; }

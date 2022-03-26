@@ -1,8 +1,8 @@
 #ifndef TICKABLE_H
 #define TICKABLE_H
 
-#include "stdint.h"
 #include "bool.h"
+#include "stdint.h"
 
 #define MAX_TICKABLES 6
 
@@ -19,6 +19,6 @@ void TickableEnable(Tickable *t);
 void TickableDisable(Tickable *t);
 void TickableReset(Tickable *t);
 void TickableUpdate(uint64_t delta);
-Tickable* TickableList();
+Tickable *TickableList();
 
 #endif // TICKABLE_H

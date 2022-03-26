@@ -1,7 +1,7 @@
 #ifndef ADC_H
 #define ADC_H
 
-#define ADC_VREF_OFF (0 << REFS1) | (0 << REFS0)
+#define ADC_VREF_OFF  (0 << REFS1) | (0 << REFS0)
 #define ADC_VREF_AVCC (0 << REFS1) | (1 << REFS0)
 #define ADC_VREF_AREF (1 << REFS1) | (1 << REFS0)
 
@@ -17,4 +17,4 @@
 
 #define ADC_AUTO_TRIGGER_SOURCE_TCC0_COMPARE_MATCH_A ((0 << ADTS2) | (1 << ADTS1) | (1 << ADTS0))
 
-#endif //ADC_H
+#endif // ADC_H

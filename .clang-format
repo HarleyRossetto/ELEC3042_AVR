@@ -1,0 +1,14 @@
+# https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+
+IndentWidth: 4
+UseTab: Never
+ColumnLimit: 120
+BitFieldColonSpacing: Both
+
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveMacros: AcrossEmptyLines
+AlignAfterOpenBracket: Align
+AlignArrayOfStructures: Right
+AlignTrailingComments: true
+SpaceBeforeParens: true
+BreakBeforeBraces: Attach
