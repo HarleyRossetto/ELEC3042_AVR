@@ -491,7 +491,11 @@ void toggleDecimalPlaceDisplay() {
 
 // #define OVERRIDE_DISPLAY_FUNCTION
 
-Tickable *buzzerRun = 0;
+Tickable *buzzerDisable = 0;
+
+void disableBuzzer() {
+    disableTimer(TC2);
+}
 
 int main()
 {
@@ -509,12 +513,13 @@ int main()
                                                             timeSetMinDecrement}};
     stateMachinePtr = &stateMachine;
 
-    //Create a tickable event which increments the seconds, once every second.
-    TickableCreate(1000L, incrementSecond, true);
-    //Create a tickable even which toggle the decimal place display every 500ms.
-    TickableCreate(500L, toggleDecimalPlaceDisplay, true);
-
-    buzzerRun = TickableCreate(5000L, 0, false);
+    // Create a tickable event which increments the seconds, once every second.
+    TickableCreate(1000L, incrementSecond, true, false);
+    // Create a tickable even which toggle the decimal place display every 500ms.
+    TickableCreate(500L, toggleDecimalPlaceDisplay, true, false);
+    // Create a tickable event for disabling the buzzer. Runs for 5 seconds, disables buzzer and then 
+    // is disabled (because it is created as a 1-shot tickable).
+    buzzerDisable = TickableCreate(5000L, disableBuzzer, false, true);
 
     enableTimers();
 
