@@ -15,4 +15,6 @@
 #define ADC_CH_7 0b0111
 #define ADC_CH_8 0b1000
 
+#define ADC_AUTO_TRIGGER_SOURCE_TCC0_COMPARE_MATCH_A ((0 << ADTS2) | (1 << ADTS1) | (1 << ADTS0))
+
 #endif //ADC_H

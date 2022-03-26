@@ -15,13 +15,23 @@ FSM_TRANSITION_TABLE *stateMachinePtr = 0;
 /// TIMING
 #define TIMER1_TICKS_PER_SECOND_256PRESCALE         F_CPU / 256
 #define TIMER1_TICKS_PER_100_MILLIS_256PRESCALE     TIMER1_TICKS_PER_SECOND_256PRESCALE / 10
-#define TIMER1_PERIOD_MILLISECONDS  100
+#define TIMER1_PERIOD_MILLISECONDS                  100
+
+#define TIMER2_TICKS_PER_SECOND_64_PRESCALE         F_CPU / 64
+#define TIMER2_TICKS_PER_MILLISEC_64_PRESCALE       TIMER2_TICKS_PER_SECOND_64_PRESCALE / 250
+#define TIMER2_PERIOD_MILLISECONDS                  1
 
 void enableTimers()
 {
-    // Primary second counter
-    enableTimer(TC1, CLOCK_SELECT_256_PRESCALER);
+    // Primary millisecond counter
+    enableTimer(TC2, TIMER2_CLOCK_SELECT_64_PRESCALER);
+    
+    // 7 Segment Display Update
     enableTimer(TC0, CLOCK_SELECT_1024_PRESCALER);
+    
+    // Buzzer
+    //enableTimer(TC1, CLOCK_SELECT_256_PRESCALER);
+
 }
 
 volatile Time clock;
@@ -151,6 +161,12 @@ void initialiseTimer1()
     // Generation Modes (bits 11 and 10))
     TCCR1A = (0 << WGM11) | (0 << WGM10); // Waveform Generation Mode - CTC
 
+    // Timer starts once Clock Select is set, so we will configure that last.
+    //  Timer/Counter Control Register B (Input Capture Noise Canceler, Input
+    //  Capture Edge Select, Waveform Generation Mode (bits 13 and 12), and Clock
+    //  Select)
+    TCCR1B = (0 << WGM13) | (1 << WGM12);
+
     // Timer/Counter Control Register C (Force Output Compare)
     TCCR1C = 0x00;
 
@@ -172,16 +188,9 @@ void initialiseTimer1()
     // Timer/Counter Interrupt Flag Register (Input Capture, Output Compare A/B
     // and Overflow Flags)
     TIFR1 = 0x00; // Ensure all timer interrupt flags are cleared.
-
-    // Timer starts once Clock Select is set, so we will configure that last.
-    //  Timer/Counter Control Register B (Input Capture Noise Canceler, Input
-    //  Capture Edge Select, Waveform Generation Mode (bits 13 and 12), and Clock
-    //  Select)
-    TCCR1B = (0 << WGM13) | (1 << WGM12);
-    //    | // Waveform Generation Mode - CTC
-    //(1 << CS12) | (0 << CS11) | (1 << CS10);   //Clock Select - 1024 prescaler
 }
 
+// Display Update Timer
 void initialiseTimer0()
 {
     TCCR0A = (1 << WGM01) | (0 << WGM00);
@@ -193,7 +202,19 @@ void initialiseTimer0()
     TIFR0 = 0x00;
 }
 
-#define ADC_AUTO_TRIGGER_SOURCE_TCC0_COMPARE_MATCH_A ((0 << ADTS2) | (1 << ADTS1) | (1 << ADTS0))
+// Millisecond timer
+void initialiseTimer2()
+{
+    TCCR2A = (1 << WGM01) | (0 << WGM00);
+    TCCR2B = (0 << WGM02);
+    TCNT2 = 0;
+    OCR2A = 250;
+    OCR2B = 0;
+    TIMSK2 = (1 << OCIE0A);
+    TIFR2 = 0x00;
+}
+
+
 
 void initialiseADC()
 {
@@ -241,6 +262,7 @@ int initialise()
     SevenSegmentInitialise( &DISPLAY_DDR, DISPLAY_DATA_IN, &DISPLAY_PORT, 
                             &DISPLAY_CLOCK_DDR, &DISPLAY_CLOCK_PORT, DISPLAY_SHIFT_PIN, DISPLAY_LATCH_PIN);
     initialiseButtons();
+    initialiseTimer2();
     initialiseTimer1();
     initialiseTimer0();
     initialiseADC();
@@ -499,8 +521,7 @@ int main()
     sei();
 
     #ifdef OVERRIDE_DISPLAY_FUNCTION
-        displayFunction = displayFunctionTimeHHMM;
-        // displayFunction = displayFunctionADCValue;
+        displayFunction = displayFunctionADCValue;
     #endif
 
     while (1)
@@ -533,17 +554,23 @@ int main()
     return 0;
 }
 
+//Buzzer
 ISR(TIMER1_COMPA_vect)
 {
-    TickableUpdate(TIMER1_PERIOD_MILLISECONDS);
-
-    //Add 100 milliseconds - any millis already accounted for previously to the system counter.
-    addMillisToSystemCounter(TIMER1_PERIOD_MILLISECONDS - millisecondsHandledBetweenTicks);
 }
 
+// Display update
 ISR(TIMER0_COMPA_vect)
-{
+{    
     shouldUpdateDisplay = true;
+}
+
+// Main Counter
+ISR(TIMER2_COMPA_vect) {
+    TickableUpdate(TIMER2_PERIOD_MILLISECONDS);
+
+    //Add 100 milliseconds - any millis already accounted for previously to the system counter.
+    addMillisToSystemCounter(TIMER2_PERIOD_MILLISECONDS - millisecondsHandledBetweenTicks);
 }
 
 ISR(ADC_vect)
