@@ -2,6 +2,7 @@
 #define TICKABLE_H
 
 #include "stdint.h"
+#include "bool.h"
 
 #define MAX_TICKABLES 6
 
@@ -9,9 +10,13 @@ typedef struct {
     uint64_t period;
     void (*eventCallback)();
     uint64_t elaspedTime;
+    bool enabled;
 } Tickable;
 
-Tickable TickableCreate(uint64_t p, void (*e)());
+Tickable *TickableCreate(uint64_t p, void (*e)(), bool enable);
+void TickableEnable(Tickable *t);
+void TickableDisable(Tickable *t);
+void TickableReset(Tickable *t);
 void TickableUpdate(uint64_t delta);
 Tickable* TickableList();
 
