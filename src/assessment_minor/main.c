@@ -389,6 +389,7 @@ void displayFunctionTimeHHMM()
 
     uint8_t hours = clock.hours;
 
+    // 12 hour time adjustment.
     if (timeMode == TWELVE_HOUR_TIME && hours > 12) {
         hours -= 12;
     }
@@ -402,10 +403,9 @@ void displayFunctionTimeHHMM()
     displayData.data[0] = mapChar(hh);  //Far Left
 
     // Decimal Point
-    //Must show constantly when in MMSS state. Currently does not.
     displayData.data[1] &= (withDp ? mapChar(DP) : mapChar(BLANK));
 
-    //PM Indicator
+    // PM Indicator: Active if showing 12 hours time and hours are > 12.
     displayData.data[3] &= (timeMode == TWELVE_HOUR_TIME && clock.hours > 12 ? mapChar(DP) : mapChar(BLANK));
 }
 
