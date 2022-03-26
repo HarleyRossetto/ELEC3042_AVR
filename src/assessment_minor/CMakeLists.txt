@@ -16,7 +16,6 @@ set(SOURCES
         "src/${TARGET}/fsm.c"
         "src/${TARGET}/bool.h"
         "src/${TARGET}/timers.h"
-        "src/${TARGET}/display.h"
         "src/${TARGET}/button.h"
         "src/${TARGET}/button.c"
         "src/${TARGET}/clock.h"
@@ -25,7 +24,10 @@ set(SOURCES
         "src/${TARGET}/systemtimer.c"
         "src/${TARGET}/eeprom.h"
         "src/${TARGET}/tickable.h"
-        "src/${TARGET}/tickable.c")
+        "src/${TARGET}/tickable.c"
+        "src/${TARGET}/sevenSegmentDisplay.h"
+        "src/${TARGET}/sevenSegmentDisplay.c"
+        )
 
 ####################################################################################################
 

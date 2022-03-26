@@ -2,24 +2,20 @@
 #include "avr/io.h"
 
 #include "adc.h"
-#include "display.h"
 #include "fsm.h"
 #include "timers.h"
 #include "button.h"
 #include "clock.h"
 #include "systemtimer.h"
 #include "tickable.h"
+#include "sevenSegmentDisplay.h"
 
 FSM_TRANSITION_TABLE *stateMachinePtr = 0;
 
 /// TIMING
-
-// volatile uint64_t currentTimeMilliseconds = 0;
-// volatile uint16_t millisAccountedBetweenTicks;
-// #define addMillisecondsToSystemCounter(millis) currentTimeMilliseconds += millis;
-
-#define TIMER1_TICKS_PER_SECOND_256 62500
-#define TIMER1_TICKS_PER_100_MILLIS_256PRESCALE TIMER1_TICKS_PER_SECOND_256 / 10
+#define TIMER1_TICKS_PER_SECOND_256PRESCALE         F_CPU / 256
+#define TIMER1_TICKS_PER_100_MILLIS_256PRESCALE     TIMER1_TICKS_PER_SECOND_256PRESCALE / 10
+#define TIMER1_PERIOD_MILLISECONDS  100
 
 void enableTimers()
 {
@@ -36,7 +32,7 @@ typedef enum
     TWENTY_FOUR_HOUR_TIME
 } TimeMode;
 
-TimeMode timeMode = TWELVE_HOUR_TIME;
+TimeMode timeMode = TWENTY_FOUR_HOUR_TIME;
 
 /// TIMING
 
@@ -117,7 +113,7 @@ bool decrementPressed();
 
 /// DISPLAY
 
-volatile DisplayData displayData = {{1, 2, 3, 4}};
+DisplayData displayData = {{0, 0, 0, 0}};
 
 typedef void (*DisplayFunctionPointer)();
 DisplayFunctionPointer displayFunction;
@@ -130,43 +126,6 @@ DisplayFunctionPointer displayFunction;
 #define DISPLAY_CLOCK_DDR DDRD
 #define DISPLAY_SHIFT_PIN PD7
 #define DISPLAY_LATCH_PIN PD4
-
-inline void displayShiftBit()
-{
-    DISPLAY_CLOCK_PORT = (0 << DISPLAY_SHIFT_PIN);
-    DISPLAY_CLOCK_PORT = (1 << DISPLAY_SHIFT_PIN);
-}
-
-inline void displayLatch()
-{
-    DISPLAY_CLOCK_PORT = (0 << DISPLAY_LATCH_PIN);
-    DISPLAY_CLOCK_PORT = (1 << DISPLAY_LATCH_PIN);
-}
-
-void displaySendData(uint8_t data, DisplaySegment segIndex)
-{
-    uint16_t buffer = (data << 8) | segIndex;
-
-    for (int i = 15; i >= 0; i--)
-    {
-        uint8_t bitToSend = (buffer >> i) & 1;
-        DISPLAY_PORT = (DISPLAY_PORT & ~(1 << DISPLAY_DATA_IN)) |
-                       (bitToSend << DISPLAY_DATA_IN);
-        displayShiftBit();
-    }
-    displayLatch();
-}
-
-
-void displayUpdate(DisplayData displayData)
-{
-    for (int i = 0; i < 4; i++)
-    {
-        displaySendData(displayData.data[i], (1 << i));
-    }
-    // Clear all displays
-    displaySendData(0xFF, 0x0F);
-}
 
 #define mapChar(c) SEGMENT_MAP[c]
 
@@ -258,11 +217,6 @@ void initialiseADC()
     DIDR0 = (1 << ADC0D); // Disable digital input on AD0
 }
 
-void initialiseDisplay() {
-    DISPLAY_DDR = (1 << DISPLAY_DATA_IN);
-    DISPLAY_CLOCK_DDR = (1 << DISPLAY_SHIFT_PIN) | (1 << DISPLAY_LATCH_PIN);
-}
-
 void initialiseButtons() {
     // Set buttons as inputs
     BUTTON_DDR &= ~((1 << BUTTON_SET) | (1 << BUTTON_INCREMENT) | (1 << BUTTON_DECREMENT));
@@ -284,7 +238,8 @@ void initialiseButtons() {
 
 int initialise()
 {
-    initialiseDisplay();
+    SevenSegmentInitialise( &DISPLAY_DDR, DISPLAY_DATA_IN, &DISPLAY_PORT, 
+                            &DISPLAY_CLOCK_DDR, &DISPLAY_CLOCK_PORT, DISPLAY_SHIFT_PIN, DISPLAY_LATCH_PIN);
     initialiseButtons();
     initialiseTimer1();
     initialiseTimer0();
@@ -551,8 +506,6 @@ int main()
                                                             timeSetMinDecrement}};
     stateMachinePtr = &stateMachine;
 
-    //Create a tickable event which increments the minutes every 2 seconds.
-    TickableCreate(1000L, incrementMinute);
     //Create a tickable event which increments the seconds, once every second.
     TickableCreate(1000L, incrementSecond);
     //Create a tickable even which toggle the decimal place display every 500ms.
@@ -590,7 +543,7 @@ int main()
                    displayFunction();
             }
 
-            displayUpdate(displayData);
+            SevenSegmentUpdate(displayData.data);
         }
     }
 
@@ -599,10 +552,10 @@ int main()
 
 ISR(TIMER1_COMPA_vect)
 {
-    TickableUpdate(100L);
+    TickableUpdate(TIMER1_PERIOD_MILLISECONDS);
 
     //Add 100 milliseconds - any millis already accounted for previously to the system counter.
-    addMillisToSystemCounter(100 - millisecondsHandledBetweenTicks);
+    addMillisToSystemCounter(TIMER1_PERIOD_MILLISECONDS - millisecondsHandledBetweenTicks);
 }
 
 ISR(TIMER0_COMPA_vect)

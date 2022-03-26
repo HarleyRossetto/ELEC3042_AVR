@@ -14,9 +14,6 @@
 			"CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY"
 		},
 		"files.associations": {
-			"stdint.h": "c",
-			"iom328p.h": "c",
-			"systemtimer.h": "c"
 		}
 	},
 	"extensions": {
