@@ -3,58 +3,78 @@
 static volatile uint16_t *countRegister = 0;
 static uint16_t ticksPer100Millis = 0;
 
-void setTiming(volatile uint16_t *countReg, uint16_t ticks) {
+Button ButtonCreate(volatile uint8_t *ddr, volatile uint8_t *port, uint8_t pin, void (*pressEvent)(), void (*releaseEvent)(), bool attachInterrupt) {
+    *ddr &= ~(1 << pin);
+    *port |= (1 << pin);
+
+    if (attachInterrupt) {
+        if (port == PORTB) {
+            PCMSK0 |= (1 << pin);
+            PCICR |= (1 << PCIE0);
+        } else if (port == PORTC) {
+            PCMSK1 |= (1 << pin);
+            PCICR |= (1 << PCIE1);
+        } else if (port == PORTD) {
+            PCMSK2 |= (1 << pin);
+            PCICR |= (1 << PCIE2);
+        }
+    }
+
+    return (Button){RELEASED, 0, pin, pressEvent, releaseEvent, false, port};
+}
+
+void ButtonSetTiming(volatile uint16_t *countReg, uint16_t ticks) {
     countRegister = countReg;
     ticksPer100Millis = ticks;
 }
 
-bool buttonTimingCorrect(volatile Button *btn) {
+bool ButtonIsTimingCorrect(volatile Button *btn) {
     if (!btn)
         return false;
 
     return millisecondsElasped() - btn->lastActionTime > BUTTON_CHANGE_DELAY_MS;
 }
 
-void updateButton(volatile Button *btn) {
+void ButtonUpdate(volatile Button *btn) {
       if (!btn)
         return;
 
     // If the button was last considered released and is now pressed.
-    if (btn->currentState == RELEASED && isPressed(btn) && buttonTimingCorrect(btn))
+    if (btn->currentState == RELEASED && ButtonIsPressed(btn) && ButtonIsTimingCorrect(btn))
     {
          //Calculate milliseconds elasped since last clock call.
         uint16_t  millisElaspedAtInterruptCall = (*countRegister * 1000 / ticksPer100Millis);
         addMillisToSystemCounter(millisElaspedAtInterruptCall);
 
-        buttonPress(btn);
+        ButtonPress(btn);
         // btn->currentState = PRESSED;
         if (btn->eventPress)
             btn->eventPress();
     }
     // Otherwise if button was last considered pressed and is now released.
-    else if (btn->currentState == PRESSED && !isPressed(btn) && buttonTimingCorrect(btn)) 
+    else if (btn->currentState == PRESSED && !ButtonIsPressed(btn) && ButtonIsTimingCorrect(btn)) 
     {
          //Calculate milliseconds elasped since last clock call.
         uint16_t  millisElaspedAtInterruptCall = (*countRegister * 1000 / ticksPer100Millis);
         addMillisToSystemCounter(millisElaspedAtInterruptCall);
 
-        buttonRelease(btn);
+        ButtonRelease(btn);
         // btn->currentState = RELEASED;
         if (btn->eventRelease)
             btn->eventRelease();
     }
 }
 
-void buttonPress(volatile Button* btn) {
+void ButtonPress(volatile Button* btn) {
     btn->currentState = PRESSED;
     btn->updated = true;
 }
 
-void buttonRelease(volatile Button* btn) {
+void ButtonRelease(volatile Button* btn) {
     btn->currentState = RELEASED;
     btn->updated = true;
 }
 
-bool isPressed(volatile Button *btn) {
+bool ButtonIsPressed(volatile Button *btn) {
     return !(*btn->port & (1 << btn->buttonPin));
 }

@@ -4,6 +4,7 @@
 #include "stdint.h"
 #include "bool.h"
 #include "systemtimer.h"
+#include "avr/io.h"
 
 typedef enum
 {
@@ -22,14 +23,12 @@ typedef struct {
     volatile uint8_t *port;
 } Button;
 
-// #define getButtonState(buttonPin, buttonInput) (*buttonInput & (1 << buttonPin) ? RELEASED : PRESSED)
-// #define isPressed(buttonPin, buttonInput) !(*buttonInput & (1 << buttonPin))
-
-void setTiming(volatile uint16_t *countReg, uint16_t ticks);
-bool isPressed(volatile Button *btn);
-void buttonPress(volatile Button *btn);
-void buttonRelease(volatile Button *btn);
-bool buttonTimingCorrect(volatile Button *btn);
-void updateButton(volatile Button *btn);
+Button ButtonCreate(volatile uint8_t *ddr, volatile uint8_t *port, uint8_t pin, void (*pressEvent)(), void (*releaseEvent)(), bool attachInterrupt);
+void ButtonSetTiming(volatile uint16_t *countReg, uint16_t ticks);
+bool ButtonIsPressed(volatile Button *btn);
+void ButtonPress(volatile Button *btn);
+void ButtonRelease(volatile Button *btn);
+bool ButtonIsTimingCorrect(volatile Button *btn);
+void ButtonUpdate(volatile Button *btn);
 
 #endif //BUTTON_H
