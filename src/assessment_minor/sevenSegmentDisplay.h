@@ -14,6 +14,11 @@ extern const uint8_t SEGMENT_MAP[];
 
 #define ALL_SEGMENTS 0x0F
 
+#define SEG_FAR_LEFT 0
+#define SEG_LEFT 1
+#define SEG_RIGHT 2
+#define SEG_FAR_RIGHT 3
+
 typedef union {
     uint8_t data[4];
     uint8_t D0, D1, D2, D3;

@@ -233,7 +233,7 @@ void initialiseButtons() {
     buttons[1] = buttonInc;
     buttons[2] = buttonDec;
 
-    setTiming(&TCNT1, TIMER1_TICKS_PER_100_MILLIS_256PRESCALE);
+    ButtonSetTiming(&TCNT1, TIMER1_TICKS_PER_100_MILLIS_256PRESCALE);
 }
 
 int initialise()
@@ -322,19 +322,19 @@ bool triggered = false;
 
 void displayFunctionCurrentState()
 {
-    displayData.data[3] = mapChar(stateMachinePtr->currentState);    //Far Right -> Current State Index
-    displayData.data[2] = mapChar(triggered ? 9 : 0); //Center Right -> 9 if triggered, 0 if not.
-    displayData.data[1] = mapChar(matches);         //Centre Left -> FSM Matches for current state.
-    displayData.data[0] = mapChar(transitioned);    //Far Left -> FSM has transitioned.
+    displayData.data[SEG_FAR_RIGHT]  = mapChar(stateMachinePtr->currentState);    //Far Right -> Current State Index
+    displayData.data[SEG_RIGHT]      = mapChar(triggered ? 9 : 0); //Center Right -> 9 if triggered, 0 if not.
+    displayData.data[SEG_LEFT]       = mapChar(matches);         //Centre Left -> FSM Matches for current state.
+    displayData.data[SEG_FAR_LEFT]   = mapChar(transitioned);    //Far Left -> FSM has transitioned.
 }
 
 volatile uint32_t adcValue = 0;
 
 void displayFunctionADCValue() {
-    displayData.data[3] = mapChar(adcValue & 0x0F);
-    displayData.data[2] = mapChar((adcValue >> 4) & 0x0F);
-    displayData.data[1] = mapChar((adcValue >> 8) & 0x0F);
-    displayData.data[0] = mapChar((adcValue >> 12) & 0x0F);
+    displayData.data[SEG_FAR_RIGHT]  = mapChar(adcValue & 0x0F);
+    displayData.data[SEG_RIGHT]      = mapChar((adcValue >> 4) & 0x0F);
+    displayData.data[SEG_LEFT]       = mapChar((adcValue >> 8) & 0x0F);
+    displayData.data[SEG_FAR_LEFT]   = mapChar((adcValue >> 12) & 0x0F);
 }
 
 void displayFunctionTimeHHMM()
@@ -352,16 +352,16 @@ void displayFunctionTimeHHMM()
     uint8_t hl = hours % 10;
     uint8_t hh = hours / 10;
 
-    displayData.data[3] = mapChar(ml);  //Far Right
-    displayData.data[2] = mapChar(mh);  //Centre Right
-    displayData.data[1] = mapChar(hl);  //Center Left
-    displayData.data[0] = mapChar(hh);  //Far Left
+    displayData.data[SEG_FAR_RIGHT]  = mapChar(ml);  //Far Right
+    displayData.data[SEG_RIGHT]      = mapChar(mh);  //Centre Right
+    displayData.data[SEG_LEFT]       = mapChar(hl);  //Center Left
+    displayData.data[SEG_FAR_LEFT]   = mapChar(hh);  //Far Left
 
     // Decimal Point
-    displayData.data[1] &= (withDp ? mapChar(DP) : mapChar(BLANK));
+    displayData.data[SEG_LEFT] &= (withDp ? mapChar(DP) : mapChar(BLANK));
 
     // PM Indicator: Active if showing 12 hours time and hours are > 12.
-    displayData.data[3] &= (timeMode == TWELVE_HOUR_TIME && clock.hours > 12 ? mapChar(DP) : mapChar(BLANK));
+    displayData.data[SEG_FAR_RIGHT] &= (timeMode == TWELVE_HOUR_TIME && clock.hours > 12 ? mapChar(DP) : mapChar(BLANK));
 }
 
 void displayFunctionTimeMMSS()
@@ -372,17 +372,17 @@ void displayFunctionTimeMMSS()
     uint8_t ml = clock.minutes % 10;
     uint8_t mh = clock.minutes / 10;
 
-    displayData.data[3] = mapChar(sl);  //Far Right
-    displayData.data[2] = mapChar(sh);  //Centre Right
-    displayData.data[1] = mapChar(ml);  //Center Left
-    displayData.data[0] = mapChar(mh);  //Far Left
+    displayData.data[SEG_FAR_RIGHT]  = mapChar(sl);  //Far Right
+    displayData.data[SEG_RIGHT]      = mapChar(sh);  //Centre Right
+    displayData.data[SEG_LEFT]       = mapChar(ml);  //Center Left
+    displayData.data[SEG_FAR_LEFT]   = mapChar(mh);  //Far Left
 
     // Decimal Point
     //Must show constantly when in MMSS state. Currently does not.
-    displayData.data[1] &= mapChar(DP);
+    displayData.data[SEG_LEFT] &= mapChar(DP);
 
     // PM Indicator
-    displayData.data[3] &= (timeMode == TWELVE_HOUR_TIME && clock.hours > 12 ? mapChar(DP) : mapChar(BLANK));
+    displayData.data[SEG_FAR_RIGHT] &= (timeMode == TWELVE_HOUR_TIME && clock.hours > 12 ? mapChar(DP) : mapChar(BLANK));
 }
 
 void displayFunctionSetTimeHH()
@@ -396,10 +396,10 @@ void displayFunctionSetTimeHH()
     uint8_t hl = hours % 10;
     uint8_t hh = hours / 10;
 
-    displayData.data[3] = mapChar(BLANK);   //Far Right
-    displayData.data[2] = mapChar(BLANK);   //Centre Right
-    displayData.data[1] = mapChar(hl);      //Center Left
-    displayData.data[0] = mapChar(hh);      //Far Left
+    displayData.data[SEG_FAR_RIGHT] = mapChar(BLANK);   //Far Right
+    displayData.data[SEG_RIGHT]     = mapChar(BLANK);   //Centre Right
+    displayData.data[SEG_LEFT]      = mapChar(hl);      //Center Left
+    displayData.data[SEG_FAR_LEFT]  = mapChar(hh);      //Far Left
 
     //PM Indicator
     displayData.data[3] &= (timeMode == TWELVE_HOUR_TIME && clock.hours > 12 ? mapChar(DP) : mapChar(BLANK));
@@ -410,17 +410,17 @@ void displayFunctionTimeMM()
     uint8_t ml = clock.minutes % 10;
     uint8_t mh = clock.minutes / 10;
 
-    displayData.data[3] = mapChar(ml);  //Far Right
-    displayData.data[2] = mapChar(mh);  //Centre Right
-    displayData.data[1] = mapChar(BLANK);  //Center Left
-    displayData.data[0] = mapChar(BLANK);  //Far Left
+    displayData.data[SEG_FAR_RIGHT]  = mapChar(ml);  //Far Right
+    displayData.data[SEG_RIGHT]      = mapChar(mh);  //Centre Right
+    displayData.data[SEG_LEFT]       = mapChar(BLANK);  //Center Left
+    displayData.data[SEG_FAR_LEFT]   = mapChar(BLANK);  //Far Left
 }
 
 void displayFunctionBlank() {
-    displayData.data[3] = mapChar(BLANK);   //Far Right
-    displayData.data[2] = mapChar(BLANK);   //Centre Right
-    displayData.data[1] = mapChar(BLANK);      //Center Left
-    displayData.data[0] = mapChar(BLANK);      //Far Left
+    displayData.data[SEG_FAR_RIGHT] = mapChar(BLANK);   //Far Right
+    displayData.data[SEG_RIGHT]     = mapChar(BLANK);   //Centre Right
+    displayData.data[SEG_LEFT]      = mapChar(BLANK);      //Center Left
+    displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK);      //Far Left
 }
 
 void resetSeconds() {
@@ -455,29 +455,8 @@ volatile bool buttonInterruptTriggered = false;
 
 void updateAllButtons() {
     for (int i = 0; i < BUTTON_COUNT; i++) {
-        updateButton(&buttons[i]);
+        ButtonUpdate(&buttons[i]);
     }
-}
-
-void fsmTransitionCallback(TransitionCallback result) {
-    switch (result.reason) {
-        case TRANSITIONED:
-            transitioned = true;
-            break;
-        case NO_MATCH: 
-            matches = result.data;
-            break;
-        case MATCHES:
-            matches = result.data;
-            break;
-        case NOT_TRIGGERED:
-            triggered = true;
-            break;
-        case TRIGGERED:
-            break;
-        case ACTION:
-            break;
-        }
 }
 
 volatile bool shouldUpdateDisplay = false;
@@ -489,6 +468,8 @@ void toggleDecimalPlaceDisplay() {
 }
 
 // #define OVERRIDE_DISPLAY_FUNCTION
+
+Tickable *buzzerRun = 0;
 
 int main()
 {
@@ -507,9 +488,11 @@ int main()
     stateMachinePtr = &stateMachine;
 
     //Create a tickable event which increments the seconds, once every second.
-    TickableCreate(1000L, incrementSecond);
+    TickableCreate(1000L, incrementSecond, true);
     //Create a tickable even which toggle the decimal place display every 500ms.
-    TickableCreate(500L, toggleDecimalPlaceDisplay);
+    TickableCreate(500L, toggleDecimalPlaceDisplay, true);
+
+    buzzerRun = TickableCreate(5000L, 0, false);
 
     enableTimers();
 
