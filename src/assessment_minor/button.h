@@ -5,28 +5,34 @@
 #include "bool.h"
 #include "systemtimer.h"
 #include "avr/io.h"
+#include "tickable.h"
 
 #define MAX_BUTTONS 3
 typedef enum
 {
-    NONE, PRESSED, RELEASED, HELD
+    RELEASED, PRESSED, HELD
 } ButtonState;
 
 #define BUTTON_CHANGE_DELAY_MS 15
 
+typedef volatile uint8_t *Port;
+typedef Port InputRegister;
+typedef uint8_t Pin;
+
 typedef struct {
+    Port inRegister;
+    Pin buttonPin;
     ButtonState currentState;
     uint64_t lastActionTime;
-    uint8_t buttonPin;
     void(*eventPress)();
     void(*eventRelease)();
-    bool updated;
-    volatile uint8_t *port;
+    Tickable *holdEvent;
 } Button;
 
-Button ButtonCreate(volatile uint8_t *ddr, volatile uint8_t *port, uint8_t pin, void (*pressEvent)(), void (*releaseEvent)(), bool attachInterrupt);
+Button ButtonCreate(Port ddr, Port port, Port, Pin  pin, void (*pressEvent)(), void (*releaseEvent)(), bool attachInterrupt, Tickable *tickable);
 void ButtonSetTiming(volatile uint16_t *countReg, uint16_t ticks);
 bool ButtonIsPressed(volatile Button *btn);
+bool ButtonIsReleased(volatile Button *btn);
 void ButtonPress(volatile Button *btn);
 void ButtonRelease(volatile Button *btn);
 bool ButtonIsTimingCorrect(volatile Button *btn);

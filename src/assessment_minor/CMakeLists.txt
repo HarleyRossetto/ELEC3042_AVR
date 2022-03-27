@@ -107,7 +107,7 @@ target_compile_options(${TARGET_HEX}
                     PUBLIC
                         -mmcu=${MCU}            # MCU
                         -std=${CSTD}            # C Standard
-                        -Os                     # Optimise
+                        -Ofast                     # Optimise
 
                         -Wall                   # Enable Warnings
                         

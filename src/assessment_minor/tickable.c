@@ -3,11 +3,11 @@
 static Tickable tickables[MAX_TICKABLES];
 static uint8_t tickablesUsage = 0;
 
-Tickable *TickableCreate(uint64_t p, void (*e)(), bool enable, bool oneShot) {
+Tickable *TickableCreate(uint64_t p, TickableCallback callback, CallbackArg callbackArg, bool enable, bool oneShot) {
       if (tickablesUsage > MAX_TICKABLES)
         return 0;
         
-    tickables[tickablesUsage] = (Tickable){p, e, 0, 0, enable, oneShot};
+    tickables[tickablesUsage] = (Tickable){p, callback, callbackArg, 0, enable, oneShot};
     return &tickables[tickablesUsage++];
 }
 

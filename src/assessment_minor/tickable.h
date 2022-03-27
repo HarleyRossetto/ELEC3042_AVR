@@ -18,7 +18,7 @@ typedef struct {
     bool oneShot;
 } Tickable;
 
-Tickable *TickableCreate(uint64_t p, void (*e)(), bool enable, bool oneShot);
+Tickable *TickableCreate(uint64_t p, TickableCallback callback, CallbackArg callbackArg, bool enable, bool oneShot);
 void TickableEnable(Tickable *t);
 void TickableDisable(Tickable *t);
 void TickableReset(Tickable *t);

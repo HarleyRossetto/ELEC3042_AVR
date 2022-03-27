@@ -10,6 +10,8 @@
 #include "tickable.h"
 #include "timers.h"
 
+#define NULL ((void *)0)
+
 FSM_TRANSITION_TABLE *stateMachinePtr = 0;
 
 /// TIMING
@@ -39,14 +41,6 @@ TimeMode timeMode = TWENTY_FOUR_HOUR_TIME;
 /// TIMING
 
 /// BUTTONS
-
-bool buttonHasUpdate(volatile Button *btn) {
-    bool result  = btn->updated;
-    btn->updated = false;
-    return result;
-}
-
-bool buttonHasNewPress(volatile Button *btn) { return buttonHasUpdate(btn) && btn->currentState == PRESSED; }
 
 bool setButtonPressed = false;
 // Set Button pressed callback
@@ -89,11 +83,7 @@ void dec_Released() { PORTB |= (1 << PB3); }
 #define BUTTON_DDR           DDRC
 #define BUTTON_IN            PINC
 
-volatile Button buttonSet = {RELEASED, 0, BUTTON_SET, set_Pressed, set_Released, false, &BUTTON_IN};
-volatile Button buttonInc = {RELEASED, 0, BUTTON_INCREMENT, inc_Pressed, inc_Released, false, &BUTTON_IN};
-volatile Button buttonDec = {RELEASED, 0, BUTTON_DECREMENT, dec_Pressed, dec_Released, false, &BUTTON_IN};
-
-#define BUTTON_COUNT 3
+#define BUTTON_COUNT         3
 volatile Button buttons[BUTTON_COUNT];
 
 bool displayPressed();
@@ -215,7 +205,13 @@ void initialiseADC() {
     DIDR0 = (1 << ADC0D); // Disable digital input on AD0
 }
 
+void toggleTimeDisplayModes(void *arg) {
+    timeMode = (timeMode == TWELVE_HOUR_TIME ? TWENTY_FOUR_HOUR_TIME : TWELVE_HOUR_TIME);
+    PORTB ^= (1 << PB5);
+}
+
 void initialiseButtons() {
+    /*
     // Set buttons as inputs
     BUTTON_DDR &= ~((1 << BUTTON_SET) | (1 << BUTTON_INCREMENT) | (1 << BUTTON_DECREMENT));
     // Enable pull-up resistors for buttons
@@ -232,6 +228,23 @@ void initialiseButtons() {
     buttons[2] = buttonDec;
 
     ButtonSetTiming(&TCNT1, TIMER2_TICKS_PER_MILLISEC_64_PRESCALE);
+    */
+
+    //   volatile Button buttonSet = {&BUTTON_DDR, &BUTTON_PORT, &BUTTON_IN,  BUTTON_SET,          RELEASED, 0,
+    //   set_Pressed, set_Released, false, };
+    // volatile Button buttonInc = {&BUTTON_DDR, &BUTTON_PORT, &BUTTON_IN,  BUTTON_INCREMENT,    RELEASED, 0,
+    // inc_Pressed, inc_Released, false, &BUTTON_IN}; volatile Button buttonDec = {&BUTTON_DDR, &BUTTON_PORT,
+    // &BUTTON_IN,  BUTTON_DECREMENT,    RELEASED, 0,      dec_Pressed, dec_Released, false, &BUTTON_IN};
+
+    buttons[0] = 
+        ButtonCreate(&BUTTON_DDR, &BUTTON_PORT, &BUTTON_IN, BUTTON_SET, set_Pressed, set_Released, true, NULL);
+
+    buttons[1] =
+        ButtonCreate(&BUTTON_DDR, &BUTTON_PORT, &BUTTON_IN, BUTTON_INCREMENT, inc_Pressed, inc_Released, true, NULL);
+
+    Tickable *tickableToggleDisplayModes = TickableCreate(2000L, toggleTimeDisplayModes, NULL, false, true);
+    buttons[2] =
+        ButtonCreate(&BUTTON_DDR, &BUTTON_PORT, &BUTTON_IN, BUTTON_DECREMENT, dec_Pressed, dec_Released, true, tickableToggleDisplayModes);
 }
 
 int initialise() {
@@ -262,20 +275,11 @@ bool buttonPressed(bool *buttonPressFlag) {
 
 bool displayPressed() { return decrementPressed(); }
 
-bool setPressed() {
-    // return buttonHasNewPress(&buttonSet);
-    return buttonPressed(&setButtonPressed);
-}
+bool setPressed() { return buttonPressed(&setButtonPressed); }
 
-bool incrementPressed() {
-    // return buttonHasNewPress(&buttonInc);
-    return buttonPressed(&incrementButtonPressed);
-}
+bool incrementPressed() { return buttonPressed(&incrementButtonPressed); }
 
-bool decrementPressed() {
-    // return buttonHasNewPress(&buttonDec);
-    return buttonPressed(&decrementButtonPressed);
-}
+bool decrementPressed() { return buttonPressed(&decrementButtonPressed); }
 
 void incrementHour() { addHours(&clock, 1); }
 
@@ -302,7 +306,6 @@ void displayFunctionCurrentState() {
 }
 
 volatile uint32_t adcValue = 0;
-
 void displayFunctionADCValue() {
     displayData.data[SEG_FAR_RIGHT] = mapChar(adcValue & 0x0F);
     displayData.data[SEG_RIGHT]     = mapChar((adcValue >> 4) & 0x0F);
@@ -400,12 +403,31 @@ void displayFunctionISRTime() {
     // uint64_t delta = isrTimeEnd - isrTime;
     int8_t delta = isrTimeEnd - isrTime;
 
-    displayData.data[SEG_FAR_RIGHT] = mapChar(delta & 0xF);        // Far Right
-    displayData.data[SEG_RIGHT]     = mapChar((delta >> 4) & 0xF); // Centre Right
-    displayData.data[SEG_LEFT]      = mapChar((delta >> 8) & 0xF);           // Center Left
-    displayData.data[SEG_FAR_LEFT]  = mapChar((delta >> 12) & 0xF);    // Far Left
+    displayData.data[SEG_FAR_RIGHT] = mapChar(delta & 0xF);         // Far Right
+    displayData.data[SEG_RIGHT]     = mapChar((delta >> 4) & 0xF);  // Centre Right
+    displayData.data[SEG_LEFT]      = mapChar((delta >> 8) & 0xF);  // Center Left
+    displayData.data[SEG_FAR_LEFT]  = mapChar((delta >> 12) & 0xF); // Far Left
 }
 
+void displayFunctionTwo8BitReg(volatile uint8_t *r1, volatile uint8_t *r2) {
+    displayData.data[SEG_FAR_RIGHT] = mapChar(*r2 & 0xF);        // Far Right
+    displayData.data[SEG_RIGHT]     = mapChar((*r2 >> 4) & 0xF); // Centre Right
+    displayData.data[SEG_LEFT]      = mapChar(*r1 & 0xF);        // Center Left
+    displayData.data[SEG_FAR_LEFT]  = mapChar((*r1 >> 4) & 0xF); // Far Left
+}
+
+void displayFunction8BitReg(volatile uint8_t *r1) { displayFunctionTwo8BitReg(r1, 0); }
+
+void displayFunctionPCICR() { displayFunction8BitReg(&PCICR); }
+
+void displayFunctionDDRC() { displayFunctionTwo8BitReg(&DDRC, &PORTC); }
+
+void displayFunctionButtonStates() {
+    displayData.data[SEG_FAR_RIGHT] = mapChar(buttons[2].currentState); // Far Right
+    displayData.data[SEG_RIGHT]     = mapChar(buttons[1].currentState); // Centre Right
+    displayData.data[SEG_LEFT]      = mapChar(buttons[0].currentState); // Center Left
+    displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK);                   // Far Left
+}
 
 void resetSeconds() { clock.seconds = 0; }
 
@@ -455,6 +477,8 @@ int main() {
     if (!initialise())
         return -1;
 
+    addTime(&clock, 14, 13, 44);
+
     FSM_TRANSITION_TABLE stateMachine = {
         DISPLAY_HH_MM,
         {displayHoursToDisplayMinutes, displayHoursToSetTime, displayMinutesToDisplayHours, timeSetHrToMin,
@@ -463,20 +487,21 @@ int main() {
     stateMachinePtr = &stateMachine;
 
     // Create a tickable event which increments the seconds, once every second.
-    TickableCreate(1000L, incrementSecond, true, false);
+    TickableCreate(1000L, incrementSecond, 0, true, false);
     // Create a tickable even which toggle the decimal place display every 500ms.
-    TickableCreate(500L, toggleDecimalPlaceDisplay, true, false);
+    TickableCreate(500L, toggleDecimalPlaceDisplay, 0, true, false);
     // Create a tickable event for disabling the buzzer. Runs for 5 seconds,
     // disables buzzer and then is disabled (because it is created as a 1-shot
     // tickable).
-    buzzerDisable = TickableCreate(5000L, disableBuzzer, false, true);
+    // buzzerDisable = TickableCreate(5000L, disableBuzzer, 0, false, true);
 
     enableTimers();
 
     sei();
 
 #ifdef OVERRIDE_DISPLAY_FUNCTION
-    displayFunction = displayFunctionADCValue;
+    // displayFunction = displayFunctionADCValue;
+    displayFunction = displayFunctionButtonStates;
 #endif
 
     while (1) {
