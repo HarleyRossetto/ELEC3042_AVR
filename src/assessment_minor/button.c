@@ -3,13 +3,26 @@
 static volatile uint16_t *countRegister = 0;
 static uint16_t ticksBetweenUpdates     = 0;
 
-// static Button buttons[MAX_BUTTONS];
-// static uint8_t buttonUsage = 0;
+static Button buttons[MAX_BUTTONS];
+static uint8_t buttonUsage = 0;
 
-Button ButtonCreate(Port ddr, Port port, Port inputReg, uint8_t pin, void (*pressEvent)(),
+static void enterHeldState(void *button) {
+    if (!button)
+        return;
+
+    Button *btn = (Button *)button;
+
+    btn->currentState = HELD;
+    btn->eventHeld();
+}
+
+Button *ButtonCreate(Port ddr, Port port, Port inputReg, uint8_t pin, void (*pressEvent)(),
                     void (*releaseEvent)(), bool attachInterrupt, Tickable *tickable) {
     *ddr &= ~(1 << pin); // Set port pin as input.
     *port |= (1 << pin); // Enabled pull-up resistor.
+
+    if (buttonUsage > MAX_BUTTONS)
+        return 0;
 
     if (attachInterrupt) {
         if (port == &PORTB) {        // Port B
@@ -23,8 +36,13 @@ Button ButtonCreate(Port ddr, Port port, Port inputReg, uint8_t pin, void (*pres
             PCICR |= (1 << PCIE2);
         }
     }
-    return (Button){inputReg, pin, RELEASED, 0, pressEvent, releaseEvent, tickable};
+    buttons[buttonUsage] = (Button){inputReg, pin, RELEASED, 0, pressEvent, releaseEvent, tickable};
+    tickable->eventCallback = enterHeldState;
+    tickable->arg           = &buttons[buttonUsage];
+    return &buttons[buttonUsage++];
 }
+
+inline Button *GetButtons() { return &buttons; }
 
 void ButtonSetTiming(volatile uint16_t *countReg, uint16_t ticks) {
     countRegister       = countReg;
@@ -71,33 +89,20 @@ void ButtonUpdate(volatile Button *btn) {
             if (ButtonIsReleased(btn)) {
                 btn->currentState = RELEASED;
                 btn->lastActionTime = millisecondsElasped();
-                btn->eventRelease();
+                TickableDisable(btn->holdEvent);
+                TickableReset(btn->holdEvent);
             }
             break;
         default:
             btn->currentState = RELEASED;
             break;
+    }\
+}
+
+void ButtonUpdateAll() {
+    for (int i = 0; i < buttonUsage; i++) {
+        ButtonUpdate(&buttons[i]);
     }
-
-    // // If the button was last considered released and is now pressed.
-    // if (btn->currentState == RELEASED && ButtonIsPressed(btn) && ButtonIsTimingCorrect(btn)) {
-    //     btn->lastActionTime = millisecondsElasped();
-
-    //     ButtonPress(btn);
-    //     // btn->currentState = PRESSED;
-    //     if (btn->eventPress)
-    //         btn->eventPress();
-    // }
-    // // Otherwise if button was last considered pressed and is now released.
-    // else if (btn->currentState == PRESSED && !ButtonIsPressed(btn) && ButtonIsTimingCorrect(btn)) {
-    //     // Calculate milliseconds elasped since last clock call.
-    //     btn->lastActionTime = millisecondsElasped();
-
-    //     ButtonRelease(btn);
-    //     // btn->currentState = RELEASED;
-    //     if (btn->eventRelease)
-    //         btn->eventRelease();
-    //}
 }
 
 void ButtonPress(volatile Button *btn) {

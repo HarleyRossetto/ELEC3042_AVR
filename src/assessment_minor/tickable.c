@@ -37,7 +37,7 @@ void TickableUpdate(uint64_t delta) {
                 t->elaspedTime = 0;
                 // If a 1-shot tickable, disable after execution.
                 if (t->oneShot)
-                    TickableDisable(t);
+                    t->enabled = false;
             }
         }
     }

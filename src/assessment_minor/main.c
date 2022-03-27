@@ -44,33 +44,29 @@ TimeMode timeMode = TWENTY_FOUR_HOUR_TIME;
 
 bool setButtonPressed = false;
 // Set Button pressed callback
-void set_Pressed() {
-    PORTB &= ~(1 << PB5);
-    setButtonPressed = true;
-}
+void set_Pressed() { setButtonPressed = true; }
 
 // Set Button released callback
-void set_Released() { PORTB |= (1 << PB5); }
+bool setButtonHeld = false;
+void set_Held() { setButtonHeld = true; }
 
 bool incrementButtonPressed = false;
 // Increment Button pressed callback
-void inc_Pressed() {
-    PORTB &= ~(1 << PB4);
-    incrementButtonPressed = true;
-}
+void inc_Pressed() { incrementButtonPressed = true; }
 
 // Inc Button released callback
-void inc_Released() { PORTB |= (1 << PB4); }
+bool incrementButtonHeld = false;
+void inc_Held() {
+    incrementButtonHeld = true;
+    PORTB ^= (1 << PB5);
+}
 
 bool decrementButtonPressed = false;
 // Decrement Button pressed callback
-void dec_Pressed() {
-    PORTB &= ~(1 << PB3);
-    decrementButtonPressed = true;
-}
+void dec_Pressed() { decrementButtonPressed = true; }
 
-// Decrement Button released callback
-void dec_Released() { PORTB |= (1 << PB3); }
+bool decrementButtonHeld = false;
+void dec_Held() { decrementButtonHeld = true; }
 
 #define BUTTON_SET           PC1
 #define BUTTON_SET_INT       PCINT9
@@ -82,9 +78,6 @@ void dec_Released() { PORTB |= (1 << PB3); }
 #define BUTTON_PORT          PORTC
 #define BUTTON_DDR           DDRC
 #define BUTTON_IN            PINC
-
-#define BUTTON_COUNT         3
-volatile Button buttons[BUTTON_COUNT];
 
 bool displayPressed();
 bool setPressed();
@@ -205,46 +198,18 @@ void initialiseADC() {
     DIDR0 = (1 << ADC0D); // Disable digital input on AD0
 }
 
-void toggleTimeDisplayModes(void *arg) {
-    timeMode = (timeMode == TWELVE_HOUR_TIME ? TWENTY_FOUR_HOUR_TIME : TWELVE_HOUR_TIME);
-    PORTB ^= (1 << PB5);
-}
+void toggleTimeDisplayModes() { timeMode = (timeMode == TWELVE_HOUR_TIME ? TWENTY_FOUR_HOUR_TIME : TWELVE_HOUR_TIME); }
 
 void initialiseButtons() {
-    /*
-    // Set buttons as inputs
-    BUTTON_DDR &= ~((1 << BUTTON_SET) | (1 << BUTTON_INCREMENT) | (1 << BUTTON_DECREMENT));
-    // Enable pull-up resistors for buttons
-    BUTTON_PORT |= (1 << BUTTON_SET) | (1 << BUTTON_INCREMENT) | (1 << BUTTON_DECREMENT);
+    ButtonCreate(&BUTTON_DDR, &BUTTON_PORT, &BUTTON_IN, BUTTON_SET, set_Pressed, set_Held, true, NULL);
 
-    // Enable interrupts for buttons
-    PCMSK1 |= (1 << BUTTON_SET_INT) | (1 << BUTTON_INCREMENT_INT) | (1 << BUTTON_DECREMENT_INT);
+    Tickable *tickableIncrement = TickableCreate(1000L, NULL, NULL, false, false);
+    ButtonCreate(&BUTTON_DDR, &BUTTON_PORT, &BUTTON_IN, BUTTON_INCREMENT, inc_Pressed, inc_Held, true,
+                 tickableIncrement);
 
-    // Enable interrupt for button interrupt port
-    PCICR |= (1 << PCIE1);
-
-    buttons[0] = buttonSet;
-    buttons[1] = buttonInc;
-    buttons[2] = buttonDec;
-
-    ButtonSetTiming(&TCNT1, TIMER2_TICKS_PER_MILLISEC_64_PRESCALE);
-    */
-
-    //   volatile Button buttonSet = {&BUTTON_DDR, &BUTTON_PORT, &BUTTON_IN,  BUTTON_SET,          RELEASED, 0,
-    //   set_Pressed, set_Released, false, };
-    // volatile Button buttonInc = {&BUTTON_DDR, &BUTTON_PORT, &BUTTON_IN,  BUTTON_INCREMENT,    RELEASED, 0,
-    // inc_Pressed, inc_Released, false, &BUTTON_IN}; volatile Button buttonDec = {&BUTTON_DDR, &BUTTON_PORT,
-    // &BUTTON_IN,  BUTTON_DECREMENT,    RELEASED, 0,      dec_Pressed, dec_Released, false, &BUTTON_IN};
-
-    buttons[0] = 
-        ButtonCreate(&BUTTON_DDR, &BUTTON_PORT, &BUTTON_IN, BUTTON_SET, set_Pressed, set_Released, true, NULL);
-
-    buttons[1] =
-        ButtonCreate(&BUTTON_DDR, &BUTTON_PORT, &BUTTON_IN, BUTTON_INCREMENT, inc_Pressed, inc_Released, true, NULL);
-
-    Tickable *tickableToggleDisplayModes = TickableCreate(2000L, toggleTimeDisplayModes, NULL, false, true);
-    buttons[2] =
-        ButtonCreate(&BUTTON_DDR, &BUTTON_PORT, &BUTTON_IN, BUTTON_DECREMENT, dec_Pressed, dec_Released, true, tickableToggleDisplayModes);
+    Tickable *tickableToggleDisplayModes = TickableCreate(2000L, NULL, NULL, false, true);
+    ButtonCreate(&BUTTON_DDR, &BUTTON_PORT, &BUTTON_IN, BUTTON_DECREMENT, dec_Pressed, dec_Held, true,
+                 tickableToggleDisplayModes);
 }
 
 int initialise() {
@@ -273,13 +238,27 @@ bool buttonPressed(bool *buttonPressFlag) {
     return result;
 }
 
+bool buttonFlagActive(bool *flag) {
+    bool result = *flag;
+    if (result)
+        *flag = false;
+
+    return result;
+}
+
 bool displayPressed() { return decrementPressed(); }
+
+bool displayHeld() { return buttonFlagActive(&decrementButtonHeld); }
 
 bool setPressed() { return buttonPressed(&setButtonPressed); }
 
 bool incrementPressed() { return buttonPressed(&incrementButtonPressed); }
 
+bool incrementHeld() { return buttonFlagActive(&incrementButtonHeld); }
+
 bool decrementPressed() { return buttonPressed(&decrementButtonPressed); }
+
+bool incrementPressedOrHeld() { return incrementPressed() || incrementHeld(); }
 
 void incrementHour() { addHours(&clock, 1); }
 
@@ -397,6 +376,16 @@ void displayFunctionBlank() {
     displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK); // Far Left
 }
 
+void displayFunctionIncHold() {
+    Tickable *incTick = &GetButtons()[2].holdEvent;
+    displayData.data[SEG_FAR_RIGHT] = mapChar((incTick->elaspedTime >> 4) & 0xF); // Far Right
+    displayData.data[SEG_RIGHT]     = mapChar((incTick->elaspedTime >> 8) & 0xF); // Centre Right
+    //displayData.data[SEG_FAR_RIGHT] = mapChar(BLANK);
+    //displayData.data[SEG_RIGHT]     = mapChar(BLANK);
+    displayData.data[SEG_LEFT]          = mapChar(incTick->oneShot & 1); // Center Left
+    displayData.data[SEG_FAR_LEFT]      = mapChar(incTick->enabled & 1); // Far Left
+}
+
 volatile uint8_t isrTime    = 0;
 volatile uint8_t isrTimeEnd = 0;
 void displayFunctionISRTime() {
@@ -423,10 +412,11 @@ void displayFunctionPCICR() { displayFunction8BitReg(&PCICR); }
 void displayFunctionDDRC() { displayFunctionTwo8BitReg(&DDRC, &PORTC); }
 
 void displayFunctionButtonStates() {
-    displayData.data[SEG_FAR_RIGHT] = mapChar(buttons[2].currentState); // Far Right
-    displayData.data[SEG_RIGHT]     = mapChar(buttons[1].currentState); // Centre Right
-    displayData.data[SEG_LEFT]      = mapChar(buttons[0].currentState); // Center Left
-    displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK);                   // Far Left
+    Button *btns                    = GetButtons();
+    displayData.data[SEG_FAR_RIGHT] = mapChar(btns[2].currentState); // Far Right
+    displayData.data[SEG_RIGHT]     = mapChar(btns[1].currentState); // Centre Right
+    displayData.data[SEG_LEFT]      = mapChar(btns[0].currentState); // Center Left
+    displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK);                // Far Left
 }
 
 void resetSeconds() { clock.seconds = 0; }
@@ -441,24 +431,22 @@ FSM_TRANSITION displayHoursToDisplayMinutes = {
     noAction,
     DISPLAY_MM_SS,
 };
-FSM_TRANSITION displayHoursToSetTime        = {DISPLAY_HH_MM, setPressed, noAction, SET_TIME_MODE_HR};
+FSM_TRANSITION displayHoursToSetTime      = {DISPLAY_HH_MM, setPressed, noAction, SET_TIME_MODE_HR};
+FSM_TRANSITION displayHoursToggleTimeMode = {DISPLAY_HH_MM, displayHeld, toggleTimeDisplayModes, DISPLAY_HH_MM};
+
 FSM_TRANSITION displayMinutesToDisplayHours = {DISPLAY_MM_SS, displayPressed, noAction, DISPLAY_HH_MM};
-FSM_TRANSITION timeSetHrToMin               = {SET_TIME_MODE_HR, setPressed, noAction, SET_TIME_MODE_MIN};
-FSM_TRANSITION timeSetHrIncrement           = {SET_TIME_MODE_HR, incrementPressed, incrementHour, SET_TIME_MODE_HR};
-FSM_TRANSITION timeSetHrDecrement           = {SET_TIME_MODE_HR, decrementPressed, decrementHour, SET_TIME_MODE_HR};
-FSM_TRANSITION timeSetMinToDisplayHr        = {SET_TIME_MODE_MIN, setPressed, resetSeconds, DISPLAY_HH_MM};
-FSM_TRANSITION timeSetMinIncrement          = {SET_TIME_MODE_MIN, incrementPressed, incrementMinute, SET_TIME_MODE_MIN};
-FSM_TRANSITION timeSetMinDecrement          = {SET_TIME_MODE_MIN, decrementPressed, decrementMinute, SET_TIME_MODE_MIN};
+
+FSM_TRANSITION timeSetHrToMin     = {SET_TIME_MODE_HR, setPressed, noAction, SET_TIME_MODE_MIN};
+FSM_TRANSITION timeSetHrIncrement = {SET_TIME_MODE_HR, incrementPressedOrHeld, incrementHour, SET_TIME_MODE_HR};
+FSM_TRANSITION timeSetHrDecrement = {SET_TIME_MODE_HR, decrementPressed, decrementHour, SET_TIME_MODE_HR};
+
+FSM_TRANSITION timeSetMinToDisplayHr = {SET_TIME_MODE_MIN, setPressed, resetSeconds, DISPLAY_HH_MM};
+FSM_TRANSITION timeSetMinIncrement   = {SET_TIME_MODE_MIN, incrementPressedOrHeld, incrementMinute, SET_TIME_MODE_MIN};
+FSM_TRANSITION timeSetMinDecrement   = {SET_TIME_MODE_MIN, decrementPressed, decrementMinute, SET_TIME_MODE_MIN};
 
 /// Finite State Machine
 
 volatile bool buttonInterruptTriggered = false;
-
-void updateAllButtons() {
-    for (int i = 0; i < BUTTON_COUNT; i++) {
-        ButtonUpdate(&buttons[i]);
-    }
-}
 
 volatile bool shouldUpdateDisplay = false;
 
@@ -477,12 +465,13 @@ int main() {
     if (!initialise())
         return -1;
 
-    addTime(&clock, 14, 13, 44);
+    addTime(&clock, 14, 43, 44);
 
     FSM_TRANSITION_TABLE stateMachine = {
         DISPLAY_HH_MM,
-        {displayHoursToDisplayMinutes, displayHoursToSetTime, displayMinutesToDisplayHours, timeSetHrToMin,
-          timeSetHrIncrement, timeSetHrDecrement, timeSetMinToDisplayHr, timeSetMinIncrement, timeSetMinDecrement}
+        {displayHoursToDisplayMinutes, displayHoursToggleTimeMode, displayHoursToSetTime, displayMinutesToDisplayHours,
+          timeSetHrToMin, timeSetHrIncrement, timeSetHrDecrement, timeSetMinToDisplayHr, timeSetMinIncrement,
+          timeSetMinDecrement}
     };
     stateMachinePtr = &stateMachine;
 
@@ -500,8 +489,7 @@ int main() {
     sei();
 
 #ifdef OVERRIDE_DISPLAY_FUNCTION
-    // displayFunction = displayFunctionADCValue;
-    displayFunction = displayFunctionButtonStates;
+    displayFunction = displayFunctionIncHold;
 #endif
 
     while (1) {
@@ -510,6 +498,10 @@ int main() {
             setButtonPressed       = false;
             incrementButtonPressed = false;
             decrementButtonPressed = false;
+
+            setButtonHeld       = false;
+            incrementButtonHeld = false;
+            decrementButtonHeld = false;
         }
 
 #ifndef OVERRIDE_DISPLAY_FUNCTION
@@ -555,11 +547,8 @@ ISR(ADC_vect) {
     adcValue = OCR0A = ADCH;
 }
 
-/**
- * Button interrupt register
- *
- */
+// Button interrupt register
 ISR(PCINT1_vect) {
     if (BUTTON_IN)
-        updateAllButtons();
+        ButtonUpdateAll();
 }

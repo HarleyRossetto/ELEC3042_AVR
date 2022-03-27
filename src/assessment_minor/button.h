@@ -25,11 +25,12 @@ typedef struct {
     ButtonState currentState;
     uint64_t lastActionTime;
     void(*eventPress)();
-    void(*eventRelease)();
+    void(*eventHeld)();
     Tickable *holdEvent;
 } Button;
 
-Button ButtonCreate(Port ddr, Port port, Port, Pin  pin, void (*pressEvent)(), void (*releaseEvent)(), bool attachInterrupt, Tickable *tickable);
+Button *ButtonCreate(Port ddr, Port port, Port, Pin  pin, void (*pressEvent)(), void (*releaseEvent)(), bool attachInterrupt, 
+                    Tickable *tickable);
 void ButtonSetTiming(volatile uint16_t *countReg, uint16_t ticks);
 bool ButtonIsPressed(volatile Button *btn);
 bool ButtonIsReleased(volatile Button *btn);
@@ -37,5 +38,7 @@ void ButtonPress(volatile Button *btn);
 void ButtonRelease(volatile Button *btn);
 bool ButtonIsTimingCorrect(volatile Button *btn);
 void ButtonUpdate(volatile Button *btn);
+void ButtonUpdateAll();
+Button *GetButtons();
 
 #endif //BUTTON_H

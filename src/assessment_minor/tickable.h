@@ -4,7 +4,7 @@
 #include "bool.h"
 #include "stdint.h"
 
-#define MAX_TICKABLES 10
+#define MAX_TICKABLES 16
 
 typedef void (*TickableCallback)(void *arg);
 typedef void *CallbackArg;
