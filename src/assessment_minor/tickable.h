@@ -4,11 +4,15 @@
 #include "bool.h"
 #include "stdint.h"
 
-#define MAX_TICKABLES 6
+#define MAX_TICKABLES 10
+
+typedef void (*TickableCallback)(void *arg);
+typedef void *CallbackArg;
 
 typedef struct {
     uint64_t period;
-    void (*eventCallback)();
+    TickableCallback eventCallback;
+    CallbackArg arg;
     uint64_t elaspedTime;
     bool enabled;
     bool oneShot;

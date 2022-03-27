@@ -37,7 +37,9 @@ bool ButtonIsTimingCorrect(volatile Button *btn) {
     if (!btn)
         return false;
 
-    return millisecondsElasped() - btn->lastActionTime > BUTTON_CHANGE_DELAY_MS;
+    uint64_t delta = millisecondsElasped() - btn->lastActionTime;
+
+    return delta > BUTTON_CHANGE_DELAY_MS;
 }
 
 void ButtonUpdate(volatile Button *btn) {
@@ -46,9 +48,7 @@ void ButtonUpdate(volatile Button *btn) {
 
     // If the button was last considered released and is now pressed.
     if (btn->currentState == RELEASED && ButtonIsPressed(btn) && ButtonIsTimingCorrect(btn)) {
-        // Calculate milliseconds elasped since last clock call.
-        uint16_t millisElaspedAtInterruptCall = (*countRegister * 1000 / ticksBetweenUpdates);
-        addMillisToSystemCounter(millisElaspedAtInterruptCall);
+        btn->lastActionTime = millisecondsElasped();
 
         ButtonPress(btn);
         // btn->currentState = PRESSED;
@@ -58,8 +58,7 @@ void ButtonUpdate(volatile Button *btn) {
     // Otherwise if button was last considered pressed and is now released.
     else if (btn->currentState == PRESSED && !ButtonIsPressed(btn) && ButtonIsTimingCorrect(btn)) {
         // Calculate milliseconds elasped since last clock call.
-        uint16_t millisElaspedAtInterruptCall = (*countRegister * 1000 / ticksBetweenUpdates);
-        addMillisToSystemCounter(millisElaspedAtInterruptCall);
+        btn->lastActionTime = millisecondsElasped();
 
         ButtonRelease(btn);
         // btn->currentState = RELEASED;

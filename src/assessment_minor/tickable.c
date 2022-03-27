@@ -4,7 +4,10 @@ static Tickable tickables[MAX_TICKABLES];
 static uint8_t tickablesUsage = 0;
 
 Tickable *TickableCreate(uint64_t p, void (*e)(), bool enable, bool oneShot) {
-    tickables[tickablesUsage] = (Tickable){p, e, 0, enable, oneShot};
+      if (tickablesUsage > MAX_TICKABLES)
+        return 0;
+        
+    tickables[tickablesUsage] = (Tickable){p, e, 0, 0, enable, oneShot};
     return &tickables[tickablesUsage++];
 }
 
@@ -30,7 +33,7 @@ void TickableUpdate(uint64_t delta) {
             t->elaspedTime += delta;
 
             if (t->elaspedTime >= t->period) {
-                t->eventCallback();
+                t->eventCallback(t->arg);
                 t->elaspedTime = 0;
                 // If a 1-shot tickable, disable after execution.
                 if (t->oneShot)

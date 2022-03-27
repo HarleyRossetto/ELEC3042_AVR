@@ -3,8 +3,6 @@
 
 #include "stdint.h"
 
-extern volatile uint64_t millisecondsHandledBetweenTicks;
-
 uint64_t millisecondsElasped();
 void addMillisToSystemCounter(uint64_t millis);
 

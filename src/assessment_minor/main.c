@@ -186,12 +186,12 @@ void initialiseTimer0() {
 
 // Millisecond timer
 void initialiseTimer2() {
-    TCCR2A = (1 << WGM01) | (0 << WGM00);
-    TCCR2B = (0 << WGM02);
+    TCCR2A = (1 << WGM21) | (0 << WGM20);
+    TCCR2B = (0 << WGM22);
     TCNT2  = 0;
-    OCR2A  = 250;
+    OCR2A  = 249; // Zero relative (0 - 249 = 250)
     OCR2B  = 0;
-    TIMSK2 = (1 << OCIE0A);
+    TIMSK2 = (1 << OCF2A);
     TIFR2  = 0x00;
 }
 
@@ -394,18 +394,24 @@ void displayFunctionBlank() {
     displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK); // Far Left
 }
 
+volatile uint8_t isrTime    = 0;
+volatile uint8_t isrTimeEnd = 0;
+void displayFunctionISRTime() {
+    // uint64_t delta = isrTimeEnd - isrTime;
+    int8_t delta = isrTimeEnd - isrTime;
+
+    displayData.data[SEG_FAR_RIGHT] = mapChar(delta & 0xF);        // Far Right
+    displayData.data[SEG_RIGHT]     = mapChar((delta >> 4) & 0xF); // Centre Right
+    displayData.data[SEG_LEFT]      = mapChar((delta >> 8) & 0xF);           // Center Left
+    displayData.data[SEG_FAR_LEFT]  = mapChar((delta >> 12) & 0xF);    // Far Left
+}
+
+
 void resetSeconds() { clock.seconds = 0; }
 
 /// Display Functions
 
 /// Finite State Machine
-
-/*
-    BUTTON/CHANGE STATE ERROR
-
-    i.e. when in MMSS mode, pressing SET raises SETPRESSED flag which isnt
-   checked until return to HHMM state. Will need to clear flag after x time.
-*/
 
 FSM_TRANSITION displayHoursToDisplayMinutes = {
     DISPLAY_HH_MM,
@@ -510,11 +516,12 @@ ISR(TIMER0_COMPA_vect) { shouldUpdateDisplay = true; }
 
 // Main Counter
 ISR(TIMER2_COMPA_vect) {
+        isrTime = TCNT2;
     TickableUpdate(TIMER2_PERIOD_MILLISECONDS);
 
-    // Add 100 milliseconds - any millis already accounted for previously to the
-    // system counter.
-    addMillisToSystemCounter(TIMER2_PERIOD_MILLISECONDS - millisecondsHandledBetweenTicks);
+    // Add 1 millisecond to the system counter.
+    addMillisToSystemCounter(TIMER2_PERIOD_MILLISECONDS);
+    isrTimeEnd = TCNT2;
 }
 
 ISR(ADC_vect) {
