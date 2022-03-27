@@ -516,11 +516,12 @@ ISR(TIMER0_COMPA_vect) { shouldUpdateDisplay = true; }
 
 // Main Counter
 ISR(TIMER2_COMPA_vect) {
-        isrTime = TCNT2;
-    TickableUpdate(TIMER2_PERIOD_MILLISECONDS);
-
+    isrTime = TCNT2;
     // Add 1 millisecond to the system counter.
     addMillisToSystemCounter(TIMER2_PERIOD_MILLISECONDS);
+
+    TickableUpdate(TIMER2_PERIOD_MILLISECONDS);
+
     isrTimeEnd = TCNT2;
 }
 
