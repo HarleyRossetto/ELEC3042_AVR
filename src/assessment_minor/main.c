@@ -9,6 +9,7 @@
 #include "systemtimer.h"
 #include "tickable.h"
 #include "timers.h"
+#include "advancedButton.h"
 
 FSM_TRANSITION_TABLE *stateMachinePtr = 0;
 
@@ -89,9 +90,13 @@ void dec_Released() { PORTB |= (1 << PB3); }
 #define BUTTON_DDR           DDRC
 #define BUTTON_IN            PINC
 
-volatile Button buttonSet = {RELEASED, 0, BUTTON_SET, set_Pressed, set_Released, false, &BUTTON_IN};
-volatile Button buttonInc = {RELEASED, 0, BUTTON_INCREMENT, inc_Pressed, inc_Released, false, &BUTTON_IN};
-volatile Button buttonDec = {RELEASED, 0, BUTTON_DECREMENT, dec_Pressed, dec_Released, false, &BUTTON_IN};
+// volatile Button buttonSet = {RELEASED, 0, BUTTON_SET, set_Pressed, set_Released, false, &BUTTON_IN};
+// volatile Button buttonInc = {RELEASED, 0, BUTTON_INCREMENT, inc_Pressed, inc_Released, false, &BUTTON_IN};
+// volatile Button buttonDec = {RELEASED, 0, BUTTON_DECREMENT, dec_Pressed, dec_Released, false, &BUTTON_IN};
+
+AdvancedButton *btnSet = 0;
+AdvancedButton *btnInc = 0;
+AdvancedButton *btnDec = 0;
 
 #define BUTTON_COUNT 3
 volatile Button buttons[BUTTON_COUNT];
@@ -186,12 +191,12 @@ void initialiseTimer0() {
 
 // Millisecond timer
 void initialiseTimer2() {
-    TCCR2A = (1 << WGM01) | (0 << WGM00);
-    TCCR2B = (0 << WGM02);
-    TCNT2  = 0;
-    OCR2A  = 250;
+    TCCR2A = (1 << WGM21) | (0 << WGM20);
+    TCCR2B = (0 << WGM22);
+    OCR2A  = 249; // 0 relative!
     OCR2B  = 0;
-    TIMSK2 = (1 << OCIE0A);
+    TCNT2  = 0;
+    TIMSK2 = (1 << OCF2A);
     TIFR2  = 0x00;
 }
 
@@ -227,9 +232,9 @@ void initialiseButtons() {
     // Enable interrupt for button interrupt port
     PCICR |= (1 << PCIE1);
 
-    buttons[0] = buttonSet;
-    buttons[1] = buttonInc;
-    buttons[2] = buttonDec;
+    // buttons[0] = buttonSet;
+    // buttons[1] = buttonInc;
+    // buttons[2] = buttonDec;
 
     ButtonSetTiming(&TCNT1, TIMER2_TICKS_PER_MILLISEC_64_PRESCALE);
 }
@@ -262,20 +267,11 @@ bool buttonPressed(bool *buttonPressFlag) {
 
 bool displayPressed() { return decrementPressed(); }
 
-bool setPressed() {
-    // return buttonHasNewPress(&buttonSet);
-    return buttonPressed(&setButtonPressed);
-}
+bool setPressed() { return buttonPressed(&setButtonPressed); }
 
-bool incrementPressed() {
-    // return buttonHasNewPress(&buttonInc);
-    return buttonPressed(&incrementButtonPressed);
-}
+bool incrementPressed() { return buttonPressed(&incrementButtonPressed); }
 
-bool decrementPressed() {
-    // return buttonHasNewPress(&buttonDec);
-    return buttonPressed(&decrementButtonPressed);
-}
+bool decrementPressed() { return buttonPressed(&decrementButtonPressed); }
 
 void incrementHour() { addHours(&clock, 1); }
 
@@ -394,18 +390,23 @@ void displayFunctionBlank() {
     displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK); // Far Left
 }
 
+volatile uint8_t isrTime    = 0;
+volatile uint8_t isrTimeEnd = 0;
+void displayFunctionISRTime() {
+    // uint64_t delta = isrTimeEnd - isrTime;
+    int8_t delta = isrTimeEnd - isrTime;
+
+    displayData.data[SEG_FAR_RIGHT] = mapChar(delta & 0xF);        // Far Right
+    displayData.data[SEG_RIGHT]     = mapChar((delta >> 4) & 0xF); // Centre Right
+    displayData.data[SEG_LEFT]      = mapChar((delta >> 8) & 0xF);           // Center Left
+    displayData.data[SEG_FAR_LEFT]  = mapChar((delta >> 12) & 0xF);    // Far Left
+}
+
 void resetSeconds() { clock.seconds = 0; }
 
 /// Display Functions
 
 /// Finite State Machine
-
-/*
-    BUTTON/CHANGE STATE ERROR
-
-    i.e. when in MMSS mode, pressing SET raises SETPRESSED flag which isnt
-   checked until return to HHMM state. Will need to clear flag after x time.
-*/
 
 FSM_TRANSITION displayHoursToDisplayMinutes = {
     DISPLAY_HH_MM,
@@ -413,6 +414,7 @@ FSM_TRANSITION displayHoursToDisplayMinutes = {
     noAction,
     DISPLAY_MM_SS,
 };
+
 FSM_TRANSITION displayHoursToSetTime        = {DISPLAY_HH_MM, setPressed, noAction, SET_TIME_MODE_HR};
 FSM_TRANSITION displayMinutesToDisplayHours = {DISPLAY_MM_SS, displayPressed, noAction, DISPLAY_HH_MM};
 FSM_TRANSITION timeSetHrToMin               = {SET_TIME_MODE_HR, setPressed, noAction, SET_TIME_MODE_MIN};
@@ -442,8 +444,20 @@ void toggleDecimalPlaceDisplay() { withDp = !withDp; }
 // #define OVERRIDE_DISPLAY_FUNCTION
 
 Tickable *buzzerDisable = 0;
+Tickable *timeModeChangeTickable = 0;
 
 void disableBuzzer() { disableTimer(TC2); }
+
+void decrementHeld() {
+    if (!timeModeChangeTickable)
+        return;
+
+    TickableEnable(timeModeChangeTickable);
+}
+
+void timeModeChange() {
+    timeMode = (timeMode == TWELVE_HOUR_TIME) ? TWENTY_FOUR_HOUR_TIME : TWELVE_HOUR_TIME;
+}
 
 int main() {
     if (!initialise())
@@ -457,20 +471,28 @@ int main() {
     stateMachinePtr = &stateMachine;
 
     // Create a tickable event which increments the seconds, once every second.
-    TickableCreate(1000L, incrementSecond, true, false);
+    TickableCreate(1000L, incrementSecond, 0, true, false);
     // Create a tickable even which toggle the decimal place display every 500ms.
-    TickableCreate(500L, toggleDecimalPlaceDisplay, true, false);
+    TickableCreate(500L, toggleDecimalPlaceDisplay, 0, true, false);
     // Create a tickable event for disabling the buzzer. Runs for 5 seconds,
     // disables buzzer and then is disabled (because it is created as a 1-shot
     // tickable).
-    buzzerDisable = TickableCreate(5000L, disableBuzzer, false, true);
+    buzzerDisable = TickableCreate(5000L, disableBuzzer, 0, false, true);
+
+    btnSet = AdvBtnCreate(&BUTTON_IN, BUTTON_SET, set_Pressed, 0, set_Released);
+
+    btnInc = AdvBtnCreate(&BUTTON_IN, BUTTON_INCREMENT, inc_Pressed, 0, inc_Released);
+
+    timeModeChangeTickable = TickableCreate(1960L, 0, 0, false, true);
+    btnDec  = AdvBtnCreate(&BUTTON_IN, BUTTON_DECREMENT, dec_Pressed, decrementHeld, dec_Released);
 
     enableTimers();
 
     sei();
 
 #ifdef OVERRIDE_DISPLAY_FUNCTION
-    displayFunction = displayFunctionADCValue;
+    // displayFunction = displayFunctionADCValue;
+    displayFunction = displayFunctionISRTime;
 #endif
 
     while (1) {
@@ -510,11 +532,13 @@ ISR(TIMER0_COMPA_vect) { shouldUpdateDisplay = true; }
 
 // Main Counter
 ISR(TIMER2_COMPA_vect) {
+    isrTime = TCNT2;
     TickableUpdate(TIMER2_PERIOD_MILLISECONDS);
 
     // Add 100 milliseconds - any millis already accounted for previously to the
     // system counter.
-    addMillisToSystemCounter(TIMER2_PERIOD_MILLISECONDS - millisecondsHandledBetweenTicks);
+    addMillisToSystemCounter(TIMER2_PERIOD_MILLISECONDS);
+    isrTimeEnd = TCNT2;
 }
 
 ISR(ADC_vect) {
@@ -528,5 +552,5 @@ ISR(ADC_vect) {
  */
 ISR(PCINT1_vect) {
     if (BUTTON_IN)
-        updateAllButtons();
+        AdvBtnUpdateAll();
 }

@@ -27,6 +27,8 @@ set(SOURCES
         "src/${TARGET}/tickable.c"
         "src/${TARGET}/sevenSegmentDisplay.h"
         "src/${TARGET}/sevenSegmentDisplay.c"
+        "src/${TARGET}/advancedButton.h"        
+        "src/${TARGET}/advancedButton.c"
         )
 
 ####################################################################################################

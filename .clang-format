@@ -12,3 +12,4 @@ AlignArrayOfStructures: Right
 AlignTrailingComments: true
 SpaceBeforeParens: true
 BreakBeforeBraces: Attach
+IndentCaseLabels: true
