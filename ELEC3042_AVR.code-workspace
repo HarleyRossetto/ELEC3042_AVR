@@ -14,6 +14,7 @@
 			"CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY"
 		},
 		"files.associations": {
+			"timerTask.h": "c"
 		}
 	},
 	"extensions": {

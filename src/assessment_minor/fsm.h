@@ -4,8 +4,10 @@
 #include "stdint.h"
 #include "bool.h"
 
-typedef bool (*FSM_TRIGGER)();
-typedef void (*FSM_ACTION)();
+typedef bool (*FSM_TRIGGER_FUNC)();
+typedef bool FSMTrigger;
+typedef void (*FSM_ACTION_FUNC)();
+typedef void FSMAction;
 
 #define FSM_STATE_COUNT 4
 typedef enum FSM_STATES
@@ -16,12 +18,12 @@ typedef enum FSM_STATES
 typedef struct FSM_TRANS
 {
     FSM_STATE currentState;
-    FSM_TRIGGER trigger;
-    FSM_ACTION action;
+    FSM_TRIGGER_FUNC trigger;
+    FSM_ACTION_FUNC action;
     FSM_STATE nextState;
 } FSM_TRANSITION;
 
-#define FSM_TRANSITION_MAX 9
+#define FSM_TRANSITION_MAX 10
 typedef struct FSM_TRANS_TBL
 {
     FSM_STATE currentState;

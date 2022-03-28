@@ -23,8 +23,8 @@ set(SOURCES
         "src/${TARGET}/systemtimer.h"
         "src/${TARGET}/systemtimer.c"
         "src/${TARGET}/eeprom.h"
-        "src/${TARGET}/tickable.h"
-        "src/${TARGET}/tickable.c"
+        "src/${TARGET}/timerTask.h"
+        "src/${TARGET}/timerTask.c"
         "src/${TARGET}/sevenSegmentDisplay.h"
         "src/${TARGET}/sevenSegmentDisplay.c"
         )

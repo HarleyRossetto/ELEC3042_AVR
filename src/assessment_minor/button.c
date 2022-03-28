@@ -1,9 +1,10 @@
 #include "button.h"
+#include "avr/io.h"
 
-static volatile uint16_t *countRegister = 0;
-static uint16_t ticksBetweenUpdates     = 0;
+static uint16_t *countRegister      = 0;
+static uint16_t ticksBetweenUpdates = 0;
 
-static Button buttons[MAX_BUTTONS];
+static ButtonArray buttons;
 static uint8_t buttonUsage = 0;
 
 static void enterHeldState(void *button) {
@@ -13,11 +14,13 @@ static void enterHeldState(void *button) {
     Button *btn = (Button *)button;
 
     btn->currentState = HELD;
-    btn->eventHeld();
+    ButtonSetHoldFlag(btn);
+    if (btn->eventHeld)
+        btn->eventHeld();
 }
 
-Button *ButtonCreate(Port ddr, Port port, Port inputReg, uint8_t pin, void (*pressEvent)(),
-                    void (*releaseEvent)(), bool attachInterrupt, Tickable *tickable) {
+Button *ButtonCreate(Port ddr, Port port, Port inputReg, uint8_t pin, void (*pressEvent)(), void (*holdEvent)(), bool attachInterrupt,
+                     TimerTask *timerTask) {
     *ddr &= ~(1 << pin); // Set port pin as input.
     *port |= (1 << pin); // Enabled pull-up resistor.
 
@@ -25,8 +28,8 @@ Button *ButtonCreate(Port ddr, Port port, Port inputReg, uint8_t pin, void (*pre
         return 0;
 
     if (attachInterrupt) {
-        if (port == &PORTB) {        // Port B
-            PCMSK0 |= (1 << pin); 
+        if (port == &PORTB) { // Port B
+            PCMSK0 |= (1 << pin);
             PCICR |= (1 << PCIE0);
         } else if (port == &PORTC) { // Port C
             PCMSK1 |= (1 << pin);
@@ -36,20 +39,23 @@ Button *ButtonCreate(Port ddr, Port port, Port inputReg, uint8_t pin, void (*pre
             PCICR |= (1 << PCIE2);
         }
     }
-    buttons[buttonUsage] = (Button){inputReg, pin, RELEASED, 0, pressEvent, releaseEvent, tickable};
-    tickable->eventCallback = enterHeldState;
-    tickable->arg           = &buttons[buttonUsage];
+    buttons[buttonUsage]     = (Button){inputReg, pin, RELEASED, 0, pressEvent, holdEvent, timerTask, FLAG_CLEAR};
+    timerTask->eventCallback = enterHeldState;
+    timerTask->arg           = &buttons[buttonUsage];
     return &buttons[buttonUsage++];
 }
 
-inline Button *GetButtons() { return &buttons; }
+void GetButtons(ButtonArray *btns) { btns = &buttons; }
+// void GetButtons(Button *(btnArray[MAX_BUTTONS])) { btnArray = &buttons; }
 
-void ButtonSetTiming(volatile uint16_t *countReg, uint16_t ticks) {
+// inline Button[] *GetButtons() { return &buttons; }
+
+void ButtonSetTiming(uint16_t *countReg, uint16_t ticks) {
     countRegister       = countReg;
     ticksBetweenUpdates = ticks;
 }
 
-bool ButtonIsTimingCorrect(volatile Button *btn) {
+bool ButtonIsTimingCorrect(Button *btn) {
     if (!btn)
         return false;
 
@@ -58,45 +64,71 @@ bool ButtonIsTimingCorrect(volatile Button *btn) {
     return delta > BUTTON_CHANGE_DELAY_MS;
 }
 
-void ButtonUpdate(volatile Button *btn) {
-    //Return if pointer is null or the timing is not correct (debounce duration not exceeded yet).
+static inline void ButtonClearFlag(Button *btn) {
+    if (btn)
+        btn->actionFlag = FLAG_CLEAR;
+}
+
+void ButtonUpdate(Button *btn) {
+    // Return if pointer is null or the timing is not correct (debounce duration not exceeded yet).
     if (!btn || !ButtonIsTimingCorrect(btn))
         return;
-    
+
     switch (btn->currentState) {
         case RELEASED:
             // If currently released and the button is pressed start the hold timer.
             if (ButtonIsPressed(btn)) {
-                btn->currentState = PRESSED;
+                btn->currentState   = PRESSED;
                 btn->lastActionTime = millisecondsElasped();
                 // Start the hold event timer
-                if (btn->holdEvent)
-                    TickableEnable(btn->holdEvent);
+                if (btn->holdTimerTask)
+                    TimerTaskEnable(btn->holdTimerTask);
             }
             break;
         case PRESSED:
-            //If button is released
+            // If button is released
             if (ButtonIsReleased(btn)) {
-                btn->currentState = RELEASED;
+                btn->currentState   = RELEASED;
                 btn->lastActionTime = millisecondsElasped();
-                if (btn->holdEvent)
-                    TickableDisable(btn->holdEvent);
-                TickableReset(btn->holdEvent);
-                btn->eventPress();
+                if (btn->holdTimerTask)
+                    TimerTaskDisable(btn->holdTimerTask);
+                TimerTaskReset(btn->holdTimerTask);
+                ButtonSetPressFlag(btn);
+                if (btn->eventPress)
+                    btn->eventPress();
             }
             break;
         case HELD:
             if (ButtonIsReleased(btn)) {
-                btn->currentState = RELEASED;
+                btn->currentState   = RELEASED;
                 btn->lastActionTime = millisecondsElasped();
-                TickableDisable(btn->holdEvent);
-                TickableReset(btn->holdEvent);
+                ButtonClearFlag(btn);
+                TimerTaskDisable(btn->holdTimerTask);
+                TimerTaskReset(btn->holdTimerTask);
             }
             break;
         default:
             btn->currentState = RELEASED;
             break;
-    }\
+    }
+}
+
+void ButtonClearAllFlags() {
+    for (int i = 0; i < buttonUsage; i++) {
+        ButtonClearFlag(&buttons[i]);
+    }
+}
+
+void ButtonSetPressFlag(Button *btn) { btn->actionFlag = FLAG_PRESSED; }
+void ButtonSetHoldFlag(Button *btn) { btn->actionFlag = FLAG_HELD; }
+
+ButtonActionFlag ButtonReadFlag(Button *btn) {
+    if (!btn)
+        return FLAG_UNKNOWN;
+    return btn->actionFlag;
+    // ButtonActionFlag f = btn->actionFlag;
+    // ButtonClearFlag(btn);
+    // return f;
 }
 
 void ButtonUpdateAll() {
@@ -105,13 +137,9 @@ void ButtonUpdateAll() {
     }
 }
 
-void ButtonPress(volatile Button *btn) {
-    btn->currentState = PRESSED;
-}
+void ButtonPress(Button *btn) { btn->currentState = PRESSED; }
 
-void ButtonRelease(volatile Button *btn) {
-    btn->currentState = RELEASED;
-}
+void ButtonRelease(Button *btn) { btn->currentState = RELEASED; }
 
-bool ButtonIsPressed(volatile Button *btn) { return !ButtonIsReleased(btn); }
-bool ButtonIsReleased(volatile Button *btn) { return (*btn->inRegister & (1 << btn->buttonPin)); }
+bool ButtonIsPressed(Button *btn) { return !ButtonIsReleased(btn); }
+bool ButtonIsReleased(Button *btn) { return (*btn->inRegister & (1 << btn->buttonPin)); }
