@@ -119,27 +119,20 @@ void ButtonClearAllFlags() {
     }
 }
 
-void ButtonSetPressFlag(Button *btn) { btn->actionFlag = FLAG_PRESSED; }
-void ButtonSetHoldFlag(Button *btn) { btn->actionFlag = FLAG_HELD; }
+inline void ButtonSetPressFlag(Button *btn) { btn->actionFlag = FLAG_PRESSED; }
+inline void ButtonSetHoldFlag(Button *btn) { btn->actionFlag = FLAG_HELD; }
 
-ButtonActionFlag ButtonReadFlag(Button *btn) {
+inline ButtonActionFlag ButtonReadFlag(Button *btn) {
     if (!btn)
         return FLAG_UNKNOWN;
     return btn->actionFlag;
-    // ButtonActionFlag f = btn->actionFlag;
-    // ButtonClearFlag(btn);
-    // return f;
 }
 
-void ButtonUpdateAll() {
+inline void ButtonUpdateAll() {
     for (int i = 0; i < buttonUsage; i++) {
         ButtonUpdate(&buttons[i]);
     }
 }
-
-void ButtonPress(Button *btn) { btn->currentState = PRESSED; }
-
-void ButtonRelease(Button *btn) { btn->currentState = RELEASED; }
 
 bool ButtonIsPressed(Button *btn) { return !ButtonIsReleased(btn); }
 bool ButtonIsReleased(Button *btn) { return (*btn->inRegister & (1 << btn->buttonPin)); }

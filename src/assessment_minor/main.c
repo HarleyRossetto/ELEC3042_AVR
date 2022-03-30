@@ -168,7 +168,7 @@ Button *buttonDecrement = NULL;
 void initialiseButtons() {
     buttonSet = ButtonCreate(&DDRC, &PORTC, &PINC, PC1, NULL, NULL, true, NULL);
 
-    TimerTask *timerTaskIncrement = TimerTaskCreate(1000L, NULL, NULL, false, false);
+    TimerTask *timerTaskIncrement = TimerTaskCreate(2000L, NULL, NULL, false, false);
     buttonIncrement               = ButtonCreate(&DDRC, &PORTC, &PINC, PC2, NULL, NULL, true, timerTaskIncrement);
 
     TimerTask *timerTaskToggleDisplayModes = TimerTaskCreate(2000L, NULL, NULL, false, true);

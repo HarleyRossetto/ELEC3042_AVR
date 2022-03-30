@@ -23,12 +23,12 @@ typedef enum { FLAG_CLEAR, FLAG_PRESSED, FLAG_HELD, FLAG_UNKNOWN } ButtonActionF
 typedef struct {
     Port inRegister;
     Pin buttonPin;
-    ButtonState currentState;
+    ButtonState currentState;       // Internal Button State
     uint64_t lastActionTime;
     void(*eventPress)();
     void(*eventHeld)();
     TimerTask *holdTimerTask;
-    ButtonActionFlag actionFlag;
+    ButtonActionFlag actionFlag;    // Flags indicate button state, but are cleared upon a state transition.
 } Button;
 
 #define MAX_BUTTONS 3
@@ -39,8 +39,6 @@ Button *ButtonCreate(Port ddr, Port port, Port, Pin  pin, void (*pressEvent)(), 
 void ButtonSetTiming(uint16_t *countReg, uint16_t ticks);
 bool ButtonIsPressed(Button *btn);
 bool ButtonIsReleased(Button *btn);
-void ButtonPress(Button *btn);
-void ButtonRelease(Button *btn);
 bool ButtonIsTimingCorrect(Button *btn);
 void ButtonUpdate(Button *btn);
 void ButtonUpdateAll();

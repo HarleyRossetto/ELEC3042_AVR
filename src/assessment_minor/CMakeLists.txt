@@ -110,6 +110,7 @@ target_compile_options(${TARGET_HEX}
                         -Ofast                     # Optimise
 
                         -Wall                   # Enable Warnings
+                        -Wunused-function       # Warnings for unused functions.
                         
                         -ffunction-sections     # Place each function or data item into its own section in the output file
                         -fdata-sections         # if the target supports arbitrary sections.

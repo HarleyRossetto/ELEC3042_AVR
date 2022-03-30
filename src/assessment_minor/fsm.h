@@ -32,24 +32,9 @@ typedef struct FSM_TRANS_TBL
 
 typedef enum
 {
-    TRIGGERED,
-    NOT_TRIGGERED,
-    ACTION,
-    TRANSITIONED,
-    NO_MATCH,
-    MATCHES
-} TransitionCallbackReason;
-
-typedef enum
-{
     NO_STATE_CHANGE,
     STATE_CHANGE
 } FSMUpdateResult;
-
-typedef struct {
-    TransitionCallbackReason reason;
-    uint8_t data;
-} TransitionCallback;
 
 void
 noAction();
