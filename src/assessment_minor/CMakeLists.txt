@@ -12,6 +12,8 @@ set(TARGET
         "assessment_minor")
 set(SOURCES 
         "src/${TARGET}/main.c"
+        "src/${TARGET}/iotypes.h"
+        "src/${TARGET}/null.h"
         "src/${TARGET}/fsm.h" 
         "src/${TARGET}/fsm.c"
         "src/${TARGET}/bool.h"
@@ -25,8 +27,12 @@ set(SOURCES
         "src/${TARGET}/eeprom.h"
         "src/${TARGET}/timerTask.h"
         "src/${TARGET}/timerTask.c"
+        "src/${TARGET}/led.h"
+        "src/${TARGET}/led.c"
         "src/${TARGET}/sevenSegmentDisplay.h"
         "src/${TARGET}/sevenSegmentDisplay.c"
+        "src/${TARGET}/debug/debug_display.h"
+        "src/${TARGET}/debug/debug_display.c"
         )
 
 ####################################################################################################
@@ -107,7 +113,7 @@ target_compile_options(${TARGET_HEX}
                     PUBLIC
                         -mmcu=${MCU}            # MCU
                         -std=${CSTD}            # C Standard
-                        -Ofast                     # Optimise
+                        -Os                     # Size
 
                         -Wall                   # Enable Warnings
                         -Wunused-function       # Warnings for unused functions.

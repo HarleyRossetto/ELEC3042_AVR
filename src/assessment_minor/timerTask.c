@@ -3,11 +3,13 @@
 static TimerTask timerTasks[MAX_TIMERTASKS];
 static uint8_t timerTaskUsage = 0;
 
+#define INITIAL_ELASPED_TIME 0
+
 TimerTask *TimerTaskCreate(uint64_t p, Callback callback, CallbackArg callbackArg, bool enable, bool oneShot) {
       if (timerTaskUsage > MAX_TIMERTASKS)
         return 0;
         
-    timerTasks[timerTaskUsage] = (TimerTask){p, callback, callbackArg, 0, enable, oneShot};
+    timerTasks[timerTaskUsage] = (TimerTask){p, callback, callbackArg, INITIAL_ELASPED_TIME, enable, oneShot};
     return &timerTasks[timerTaskUsage++];
 }
 

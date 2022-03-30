@@ -6,6 +6,8 @@
 #include "systemtimer.h"
 #include "avr/io.h"
 #include "timerTask.h"
+#include "iotypes.h"
+#include "null.h"
 
 typedef enum
 {
@@ -13,10 +15,6 @@ typedef enum
 } ButtonState;
 
 #define BUTTON_CHANGE_DELAY_MS 15
-
-typedef volatile uint8_t *Port;
-typedef Port InputRegister;
-typedef uint8_t Pin;
 
 typedef enum { FLAG_CLEAR, FLAG_PRESSED, FLAG_HELD, FLAG_UNKNOWN } ButtonActionFlag;
 
@@ -34,16 +32,16 @@ typedef struct {
 #define MAX_BUTTONS 3
 typedef Button ButtonArray[MAX_BUTTONS];
 
-Button *ButtonCreate(Port ddr, Port port, Port, Pin  pin, void (*pressEvent)(), void (*releaseEvent)(), bool attachInterrupt, 
+Button *ButtonCreate(Port ddr, Port port, Port, Pin  pin, void (*pressEvent)(), void (*holdEvent)(), bool attachInterrupt, 
                     TimerTask *timerTask);
 void ButtonSetTiming(uint16_t *countReg, uint16_t ticks);
 bool ButtonIsPressed(Button *btn);
 bool ButtonIsReleased(Button *btn);
-bool ButtonIsTimingCorrect(Button *btn);
 void ButtonUpdate(Button *btn);
 void ButtonUpdateAll();
 void GetButtons(ButtonArray *btns);
 void ButtonClearAllFlags();
+void ButtonClearFlagsAndForceToReleased();
 void ButtonSetPressFlag(Button *btn);
 void ButtonSetHoldFlag(Button *btn);
 ButtonActionFlag ButtonReadFlag(Button *btn);

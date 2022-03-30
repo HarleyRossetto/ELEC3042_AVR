@@ -19,8 +19,7 @@ static void enterHeldState(void *button) {
         btn->eventHeld();
 }
 
-Button *ButtonCreate(Port ddr, Port port, Port inputReg, uint8_t pin, void (*pressEvent)(), void (*holdEvent)(), bool attachInterrupt,
-                     TimerTask *timerTask) {
+Button *ButtonCreate(Port ddr, Port port, Port inputReg, uint8_t pin, void (*pressEvent)(), void (*holdEvent)(), bool attachInterrupt, TimerTask *timerTask) {
     *ddr &= ~(1 << pin); // Set port pin as input.
     *port |= (1 << pin); // Enabled pull-up resistor.
 
@@ -39,9 +38,9 @@ Button *ButtonCreate(Port ddr, Port port, Port inputReg, uint8_t pin, void (*pre
             PCICR |= (1 << PCIE2);
         }
     }
-    buttons[buttonUsage]     = (Button){inputReg, pin, RELEASED, 0, pressEvent, holdEvent, timerTask, FLAG_CLEAR};
-    timerTask->eventCallback = enterHeldState;
-    timerTask->arg           = &buttons[buttonUsage];
+    TimerTask *holdTimer      = TimerTaskCreate(2000L, enterHeldState, &buttons[buttonUsage], false, true);
+    buttons[buttonUsage] = (Button){inputReg, pin, RELEASED, 0, pressEvent, holdEvent, holdTimer, FLAG_CLEAR};
+
     return &buttons[buttonUsage++];
 }
 
@@ -55,7 +54,7 @@ void ButtonSetTiming(uint16_t *countReg, uint16_t ticks) {
     ticksBetweenUpdates = ticks;
 }
 
-bool ButtonIsTimingCorrect(Button *btn) {
+static bool ButtonIsTimingCorrect(Button *btn) {
     if (!btn)
         return false;
 
@@ -80,7 +79,7 @@ void ButtonUpdate(Button *btn) {
             if (ButtonIsPressed(btn)) {
                 btn->currentState   = PRESSED;
                 btn->lastActionTime = millisecondsElasped();
-                // Start the hold event timer
+                // Start the hold event timer if it exists.
                 if (btn->holdTimerTask)
                     TimerTaskEnable(btn->holdTimerTask);
             }
@@ -90,9 +89,11 @@ void ButtonUpdate(Button *btn) {
             if (ButtonIsReleased(btn)) {
                 btn->currentState   = RELEASED;
                 btn->lastActionTime = millisecondsElasped();
-                if (btn->holdTimerTask)
+                // If a hold timer tasks exists, disable and reset it.
+                if (btn->holdTimerTask) {
                     TimerTaskDisable(btn->holdTimerTask);
-                TimerTaskReset(btn->holdTimerTask);
+                    TimerTaskReset(btn->holdTimerTask);
+                }
                 ButtonSetPressFlag(btn);
                 if (btn->eventPress)
                     btn->eventPress();
@@ -116,6 +117,16 @@ void ButtonUpdate(Button *btn) {
 void ButtonClearAllFlags() {
     for (int i = 0; i < buttonUsage; i++) {
         ButtonClearFlag(&buttons[i]);
+    }
+}
+
+void ButtonClearFlagsAndForceToReleased() {
+    for (int i = 0; i < buttonUsage; i++) {
+        ButtonClearFlag(&buttons[i]);
+        buttons[i].currentState = RELEASED;
+        if(buttons[i].holdTimerTask)
+            TimerTaskDisable(buttons[i].holdTimerTask);
+
     }
 }
 

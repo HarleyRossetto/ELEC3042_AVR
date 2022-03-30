@@ -4,13 +4,14 @@
 #include "adc.h"
 #include "button.h"
 #include "clock.h"
+#include "debug/debug_display.h"
 #include "fsm.h"
+#include "led.h"
+#include "null.h"
 #include "sevenSegmentDisplay.h"
 #include "systemtimer.h"
 #include "timerTask.h"
 #include "timers.h"
-
-#define NULL ((void *)0)
 
 FSM_TRANSITION_TABLE *stateMachinePtr = 0;
 
@@ -32,7 +33,13 @@ void enableTimers() {
     // enableTimer(TC1, CLOCK_SELECT_256_PRESCALER);
 }
 
-volatile Time clock;
+volatile Clock clock;
+volatile bool alarmEnabled = false;
+bool alarmSounding         = false;
+volatile Clock alarm;
+
+TimerTask *buzzerDisable          = NULL;
+TimerTask *timerTaskBlinkAlarmLed = NULL;
 
 typedef enum { TWELVE_HOUR_TIME, TWENTY_FOUR_HOUR_TIME } TimeMode;
 
@@ -40,7 +47,22 @@ TimeMode timeMode = TWENTY_FOUR_HOUR_TIME;
 
 /// TIMING
 
+// Prototypes
+void toggleDecimalPlaceDisplay();
+
+FSMAction actionToggleAlarmLed();
+FSMAction actionIncrementSecond();
+// Prototypes
+
+LED ledAlarm;
+LED ledAlarmDisplayIndicator;
+
+LED ledDebug;
+
 /// BUTTONS
+Button *buttonSet       = NULL;
+Button *buttonIncrement = NULL;
+Button *buttonDecrement = NULL;
 
 bool displayPressed();
 bool setPressed();
@@ -161,45 +183,103 @@ void initialiseADC() {
     DIDR0 = (1 << ADC0D); // Disable digital input on AD0
 }
 
-Button *buttonSet       = NULL;
-Button *buttonIncrement = NULL;
-Button *buttonDecrement = NULL;
-
-void initialiseButtons() {
-    buttonSet = ButtonCreate(&DDRC, &PORTC, &PINC, PC1, NULL, NULL, true, NULL);
-
-    TimerTask *timerTaskIncrement = TimerTaskCreate(2000L, NULL, NULL, false, false);
-    buttonIncrement               = ButtonCreate(&DDRC, &PORTC, &PINC, PC2, NULL, NULL, true, timerTaskIncrement);
-
-    TimerTask *timerTaskToggleDisplayModes = TimerTaskCreate(2000L, NULL, NULL, false, true);
-    buttonDecrement                        = ButtonCreate(&DDRC, &PORTC, &PINC, PC3, NULL, NULL, true, timerTaskToggleDisplayModes);
+TimerTask *timerTaskIncrement;
+TimerTask *timerTaskDecrement;
+void incrementHoldTimerStart() {
+    timerTaskIncrement->elaspedTime = timerTaskIncrement->period;
+    TimerTaskEnable(timerTaskIncrement);
+}
+bool incrementTimerFired = false;
+bool hasIncTimerFired() {
+    if (incrementTimerFired) {
+        incrementTimerFired = false;
+        return true;
+    }
+    return false;
+}
+void incrementTime() {
+    // If the button is not still held, stop the timer.
+    if (buttonIncrement->currentState != HELD) {
+        TimerTaskDisable(timerTaskIncrement);
+        return;
+    }
+    incrementTimerFired = true;
 }
 
-int initialise() {
-    SevenSegmentInitialise(&DISPLAY_DDR, DISPLAY_DATA_IN, &DISPLAY_PORT, &DISPLAY_CLOCK_DDR, &DISPLAY_CLOCK_PORT, DISPLAY_SHIFT_PIN,
-                           DISPLAY_LATCH_PIN);
+void decrementHoldTimerStart() {
+    timerTaskDecrement->elaspedTime = timerTaskDecrement->period;
+    TimerTaskEnable(timerTaskDecrement);
+}
+bool decrementTimerFired = false;
+void decrementTime() {
+    // If the button is not still held, stop the timer.
+    if (buttonDecrement->currentState != HELD) {
+        TimerTaskDisable(timerTaskDecrement);
+        return;
+    }
+    decrementTimerFired = true;
+}
+bool hasDecTimerFired() {
+    if (decrementTimerFired) {
+        decrementTimerFired = false;
+        return true;
+    }
+    return false;
+}
+
+FSMAction actionClearButtonsTimersAndFlags() {
+}
+
+void initialiseButtons() {
+
+    buttonSet       = ButtonCreate(&DDRC, &PORTC, &PINC, PC1, NULL, NULL, true, NULL);
+    buttonIncrement = ButtonCreate(&DDRC, &PORTC, &PINC, PC2, NULL, incrementHoldTimerStart, true, NULL);
+    buttonDecrement = ButtonCreate(&DDRC, &PORTC, &PINC, PC3, NULL, decrementHoldTimerStart, true, NULL);
+}
+
+void initialiseTimerTasks() {
+    // Create a timer task which increments the seconds, once every second.
+    TimerTaskCreate(1000L, actionIncrementSecond, 0, true, false);
+    // Create a timer task which toggle the decimal place display every 500ms.
+    TimerTaskCreate(500L, toggleDecimalPlaceDisplay, 0, true, false);
+
+    // Timer task for alarm set mode (led blink)
+    timerTaskBlinkAlarmLed = TimerTaskCreate(500L, actionToggleAlarmLed, NULL, false, false);
+
+    timerTaskIncrement = TimerTaskCreate(1000L, incrementTime, NULL, false, false);
+    timerTaskDecrement = TimerTaskCreate(1000L, decrementTime, NULL, false, false);
+
+    // Create a timer task for disabling the buzzer. Runs for 5 seconds,
+    // disables buzzer and then is disabled (because it is created as a 1-shot
+    // task).
+    // buzzerDisable = TimerTaskCreate(5000L, disableBuzzer, 0, false, true);
+}
+
+void initialiseLeds() {
+    ledAlarm                 = LED_Create(&DDRB, &PORTB, PB3);
+    ledAlarmDisplayIndicator = LED_Create(&DDRB, &PORTB, PB2);
+
+    ledDebug = LED_Create(&DDRB, &PORTB, PB5);
+}
+
+void initialise() {
+    SevenSegmentInitialise(&DISPLAY_DDR, DISPLAY_DATA_IN, &DISPLAY_PORT, &DISPLAY_CLOCK_DDR, &DISPLAY_CLOCK_PORT, DISPLAY_SHIFT_PIN, DISPLAY_LATCH_PIN);
     initialiseButtons();
     initialiseTimer2();
     initialiseTimer1();
     initialiseTimer0();
     initialiseADC();
-
-    // Initialise LEDS and set inital values.
-    DDRB |= (1 << PB5) | (1 << PB4) | (1 << PB3) | (1 << PB2);
-    PORTB |= (1 << PB5) | (1 << PB4) | (1 << PB3) | (1 << PB2);
-
-    return 1;
+    initialiseLeds();
+    initialiseTimerTasks();
 }
 
 /// INITIALISERS
 
 // FSM Triggers
 
-FSMTrigger displayPressed() { return ButtonReadFlag(buttonDecrement) == FLAG_PRESSED; }
-
-FSMTrigger displayHeld() { return ButtonReadFlag(buttonDecrement) == FLAG_HELD; }
-
 FSMTrigger setPressed() { return ButtonReadFlag(buttonSet) == FLAG_PRESSED; }
+
+FSMTrigger setHeld() { return ButtonReadFlag(buttonSet) == FLAG_HELD; }
 
 FSMTrigger incrementPressed() { return ButtonReadFlag(buttonIncrement) == FLAG_PRESSED; }
 
@@ -207,7 +287,25 @@ FSMTrigger incrementHeld() { return ButtonReadFlag(buttonIncrement) == FLAG_HELD
 
 FSMTrigger decrementPressed() { return ButtonReadFlag(buttonDecrement) == FLAG_PRESSED; }
 
-FSMTrigger incrementPressedOrHeld() { return incrementPressed() || incrementHeld(); }
+FSMTrigger decrementHeld() { return ButtonReadFlag(buttonDecrement) == FLAG_HELD; }
+
+// Aliases
+FSMTrigger displayPressed() { return decrementPressed(); }
+FSMTrigger displayHeld() { return decrementHeld(); }
+FSMTrigger alarmPressed() { return incrementPressed(); }
+FSMTrigger alarmHeld() { return incrementHeld(); }
+
+// If increment has been pressed or increment time task has elasped.
+FSMTrigger incrementPressedOrHeld() { return incrementPressed() || hasIncTimerFired(); }
+
+FSMTrigger decrementPressedOrHeld() { return decrementPressed() || hasDecTimerFired(); }
+
+FSMTrigger alarmSetHeld() {
+    bool res = setHeld() && buttonIncrement->currentState == PRESSED;
+    return res;
+}
+
+FSMTrigger alarmTrigger() { return (compareClocks(&clock, &alarm) == EQUAL) && !alarmSounding; }
 
 // FSM Trigger
 
@@ -223,22 +321,73 @@ FSMAction actionDecrementMinute() { addMinutes(&clock, -1); }
 
 FSMAction actionIncrementSecond() { addSeconds(&clock, 1); }
 
-FSMAction actionDecrementSecond() { addSeconds(&clock, -1); }
+FSMAction actionIncrementHourAlarm() { addHours(&alarm, 1); }
+
+FSMAction actionDecrementHourAlarm() { addHours(&alarm, -1); }
+
+FSMAction actionIncrementMinuteAlarm() { addMinutes(&alarm, 1); }
+
+FSMAction actionDecrementMinuteAlarm() { addMinutes(&alarm, -1); }
 
 FSMAction actionToggleTimeDisplayModes() { timeMode = (timeMode == TWELVE_HOUR_TIME ? TWENTY_FOUR_HOUR_TIME : TWELVE_HOUR_TIME); }
+
+FSMAction actionEnableAlarm() {
+    TimerTaskDisable(timerTaskBlinkAlarmLed);
+    alarmEnabled = true;
+    LED_On(&ledAlarm);
+}
+
+FSMAction actionToggleAlarm() {
+    alarmEnabled = !alarmEnabled;
+    LED_Toggle(&ledAlarm);
+}
+
+FSMAction actionToggleAlarmLed() { LED_Toggle(&ledAlarm); }
+
+FSMAction actionToggleAlarmIndicator() { LED_Toggle(&ledAlarmDisplayIndicator); }
+
+FSMAction actionAlarmStart() { alarmSounding = true; }
+
+FSMAction actionAlarmStop() { alarmSounding = false; }
+
+FSM_STATE stateBeforeAlarmMode = DISPLAY_HH_MM;
+FSMAction actionAlarmSetModeEnter() {
+    //Save original state.
+    stateBeforeAlarmMode = stateMachinePtr->currentState;
+
+    // Clear input timers and button flags
+    TimerTaskDisable(timerTaskIncrement);
+    TimerTaskReset(timerTaskIncrement);
+    ButtonClearFlagsAndForceToReleased();
+
+    //Enable blink for alarm set indicator
+    timerTaskBlinkAlarmLed->elaspedTime = timerTaskBlinkAlarmLed->period;
+    TimerTaskEnable(timerTaskBlinkAlarmLed);
+}
 
 // FSM Transition Actions
 
 /// Display Functions
-bool transitioned = false;
-uint8_t matches   = 0;
-bool triggered    = false;
 
-void displayFunctionTimeHHMM() {
-    uint8_t ml = clock.minutes % 10;
-    uint8_t mh = clock.minutes / 10;
+void displayFunctionBlank() {
+    displayData.data[SEG_FAR_RIGHT] = mapChar(BLANK); // Far Right
+    displayData.data[SEG_RIGHT]     = mapChar(BLANK); // Centre Right
+    displayData.data[SEG_LEFT]      = mapChar(BLANK); // Center Left
+    displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK); // Far Left
+}
 
-    uint8_t hours = clock.hours;
+void displayClockHHMMOnSegments(volatile Clock *clk) {
+    // If the pointer is null, show blank screen.
+    // Maybe light up all segments???
+    if (!clk) {
+        displayFunctionBlank();
+        return;
+    }
+
+    uint8_t ml = clk->minutes % 10;
+    uint8_t mh = clk->minutes / 10;
+
+    uint8_t hours = clk->hours;
 
     // 12 hour time adjustment.
     if (timeMode == TWELVE_HOUR_TIME && hours > 12) {
@@ -257,8 +406,12 @@ void displayFunctionTimeHHMM() {
     displayData.data[SEG_LEFT] &= (withDp ? mapChar(DP) : mapChar(BLANK));
 
     // PM Indicator: Active if showing 12 hours time and hours are > 12.
-    displayData.data[SEG_FAR_RIGHT] &= (timeMode == TWELVE_HOUR_TIME && clock.hours > 12 ? mapChar(DP) : mapChar(BLANK));
+    displayData.data[SEG_FAR_RIGHT] &= (timeMode == TWELVE_HOUR_TIME && clk->hours > 12 ? mapChar(DP) : mapChar(BLANK));
 }
+
+void displayFunctionTimeHHMM() { displayClockHHMMOnSegments(&clock); }
+
+void displayFunctionAlarmHHMM() { displayClockHHMMOnSegments(&alarm); }
 
 void displayFunctionTimeMMSS() {
     uint8_t sl = clock.seconds % 10;
@@ -280,8 +433,13 @@ void displayFunctionTimeMMSS() {
     displayData.data[SEG_FAR_RIGHT] &= (timeMode == TWELVE_HOUR_TIME && clock.hours > 12 ? mapChar(DP) : mapChar(BLANK));
 }
 
-void displayFunctionSetTimeHH() {
-    uint8_t hours = clock.hours;
+void displaySetHoursForClock(volatile Clock *clk) {
+    if (!clk) {
+        displayFunctionBlank();
+        return;
+    }
+
+    uint8_t hours = clk->hours;
 
     if (timeMode == TWELVE_HOUR_TIME && hours > 12) {
         hours -= 12;
@@ -296,12 +454,17 @@ void displayFunctionSetTimeHH() {
     displayData.data[SEG_FAR_LEFT]  = mapChar(hh);    // Far Left
 
     // PM Indicator
-    displayData.data[3] &= (timeMode == TWELVE_HOUR_TIME && clock.hours > 12 ? mapChar(DP) : mapChar(BLANK));
+    displayData.data[3] &= (timeMode == TWELVE_HOUR_TIME && clk->hours > 12 ? mapChar(DP) : mapChar(BLANK));
 }
 
-void displayFunctionTimeMM() {
-    uint8_t ml = clock.minutes % 10;
-    uint8_t mh = clock.minutes / 10;
+void displaySetMinutesForClock(volatile Clock *clk) {
+    if (!clk) {
+        displayFunctionBlank();
+        return;
+    }
+
+    uint8_t ml = clk->minutes % 10;
+    uint8_t mh = clk->minutes / 10;
 
     displayData.data[SEG_FAR_RIGHT] = mapChar(ml);    // Far Right
     displayData.data[SEG_RIGHT]     = mapChar(mh);    // Centre Right
@@ -309,148 +472,90 @@ void displayFunctionTimeMM() {
     displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK); // Far Left
 }
 
-void displayFunctionBlank() {
-    displayData.data[SEG_FAR_RIGHT] = mapChar(BLANK); // Far Right
-    displayData.data[SEG_RIGHT]     = mapChar(BLANK); // Centre Right
-    displayData.data[SEG_LEFT]      = mapChar(BLANK); // Center Left
-    displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK); // Far Left
-}
+void displayFunctionSetTimeHH() { displaySetHoursForClock(&clock); }
 
-void resetSeconds() { clock.seconds = 0; }
+void displayFunctionSetTimeMM() { displaySetMinutesForClock(&clock); }
+
+void displayFunctionSetAlarmHH() { displaySetHoursForClock(&alarm); }
+
+void displayFunctionSetAlarmMM() { displaySetMinutesForClock(&alarm); }
 
 /// Display Functions
 
-/// Debug Display Functions
+void resetSeconds() { clock.seconds = 0; }
 
-void displayFunctionIncHold() {
-    ButtonArray *btns = NULL;
-    GetButtons(btns);
+/// Finite State Machine Transitions
 
-    TimerTask *incTick = btns[2]->holdTimerTask;
+FSM_TRANSITION displayHoursToDisplayMinutes = {DISPLAY_HH_MM, displayPressed, noAction, DISPLAY_MM_SS};                  // HH:MM -> MM:SS when Display Pressed.
+FSM_TRANSITION displayHoursToSetTime        = {DISPLAY_HH_MM, setPressed, noAction, SET_TIME_MODE_HR};                   // HH:MM -> Set HH when Set Pressed.
+FSM_TRANSITION displayHoursToggleTimeMode   = {DISPLAY_HH_MM, displayHeld, actionToggleTimeDisplayModes, DISPLAY_HH_MM}; // HH:MM -> HH:MM, change 12/24hr mode when Display Held.
+FSM_TRANSITION displayHoursToggleAlarm      = {DISPLAY_HH_MM, incrementPressed, actionToggleAlarm, DISPLAY_HH_MM};       // HH:MM -> HH:MM, enable alarm when Increment Pressed.
+FSM_TRANSITION displayHoursToSetAlarm       = {DISPLAY_HH_MM, alarmSetHeld, actionAlarmSetModeEnter, ALARM_SET_HR};                     // HH:MM -> Set Alarm HH when Alarm Set Held (Set held + Alarm/increment pressed)
 
-    displayData.data[SEG_FAR_RIGHT] = mapChar((incTick->elaspedTime >> 4) & 0xF); // Far Right
-    displayData.data[SEG_RIGHT]     = mapChar((incTick->elaspedTime >> 8) & 0xF); // Centre Right
-    displayData.data[SEG_LEFT]      = mapChar(incTick->oneShot & 1);              // Center Left
-    displayData.data[SEG_FAR_LEFT]  = mapChar(incTick->enabled & 1);              // Far Left
-}
+FSM_TRANSITION alarmSetHHToAlarmSetMM = {ALARM_SET_HR, setPressed, noAction, ALARM_SET_MIN};                            // Alarm Set HH -> Alarm Set MM, when Set Pressed.
+FSM_TRANSITION alarmSetHHIncrement    = {ALARM_SET_HR, incrementPressedOrHeld, actionIncrementHourAlarm, ALARM_SET_HR}; // Alarm Set HH -> Alarm Set HH, increment hour, when Increment Pressed.
+FSM_TRANSITION alarmSetHHDecrement    = {ALARM_SET_HR, decrementPressedOrHeld, actionDecrementHourAlarm, ALARM_SET_HR}; // Alarm Set HH -> Alarm Set HH, decrement hour, when Decrement Pressed.
 
-volatile uint8_t isrTime    = 0;
-volatile uint8_t isrTimeEnd = 0;
-void displayFunctionISRTime() {
-    // uint64_t delta = isrTimeEnd - isrTime;
-    int8_t delta = isrTimeEnd - isrTime;
+// MUST RETURN TO LAST DISPLAY MODE, NEED TO STORE TEMP VARIABLE ETC ETC
+FSM_TRANSITION alarmSetMMToLastDisplayMode = {ALARM_SET_MIN, setPressed, actionEnableAlarm, DISPLAY_HH_MM};                      // Alarm Set Min -> HH:MM, enables alarm, when Set Pressed.
+FSM_TRANSITION alarmSetMMIncrement         = {ALARM_SET_MIN, incrementPressedOrHeld, actionIncrementMinuteAlarm, ALARM_SET_MIN}; // Alarm Set Min -> Alarm Set Hin, increment minute, when Increment Pressed.
+FSM_TRANSITION alarmSetMMDecrement         = {ALARM_SET_MIN, decrementPressedOrHeld, actionDecrementMinuteAlarm, ALARM_SET_MIN}; // Alarm Set Min -> Alarm Set Hin, decrement minute, when Decrement Pressed.
 
-    displayData.data[SEG_FAR_RIGHT] = mapChar(delta & 0xF);         // Far Right
-    displayData.data[SEG_RIGHT]     = mapChar((delta >> 4) & 0xF);  // Centre Right
-    displayData.data[SEG_LEFT]      = mapChar((delta >> 8) & 0xF);  // Center Left
-    displayData.data[SEG_FAR_LEFT]  = mapChar((delta >> 12) & 0xF); // Far Left
-}
+FSM_TRANSITION displayMinutesToDisplayAlarm = {DISPLAY_MM_SS, displayPressed, actionToggleAlarmIndicator, DISPLAY_ALARM}; // MM:SS -> Alarm HH:MM, toggle alarm indicator, when Display Pressed.
+FSM_TRANSITION displayMinutesToggleAlarm    = {DISPLAY_MM_SS, incrementPressed, actionToggleAlarm, DISPLAY_MM_SS};        // MM:SS -> MM:SS, toggle alarm (enable/disable), when Increment Pressed.
 
-void displayFunctionTwo8BitReg(volatile uint8_t *r1, volatile uint8_t *r2) {
-    displayData.data[SEG_FAR_RIGHT] = mapChar(*r2 & 0xF);        // Far Right
-    displayData.data[SEG_RIGHT]     = mapChar((*r2 >> 4) & 0xF); // Centre Right
-    displayData.data[SEG_LEFT]      = mapChar(*r1 & 0xF);        // Center Left
-    displayData.data[SEG_FAR_LEFT]  = mapChar((*r1 >> 4) & 0xF); // Far Left
-}
+FSM_TRANSITION displayAlarmToDisplayHHMM = {DISPLAY_ALARM, displayPressed, actionToggleAlarmIndicator, DISPLAY_HH_MM}; // Alarm HH:MM -> HH:MM, toggle alarm indicator, when Display Presed.
+FSM_TRANSITION displayAlarmToggleAlarm   = {DISPLAY_ALARM, incrementPressed, actionToggleAlarm, DISPLAY_ALARM};        // Alarm HH:MM -> Alarm HH:MM, toggle alarm (enable/disable), when Increment Pressed.
 
-void displayFunction8BitReg(volatile uint8_t *r1) { displayFunctionTwo8BitReg(r1, 0); }
+FSM_TRANSITION timeSetHrToMin     = {SET_TIME_MODE_HR, setPressed, noAction, SET_TIME_MODE_MIN};                       // Set HH -> Set MM, when Set Pressed.
+FSM_TRANSITION timeSetHrIncrement = {SET_TIME_MODE_HR, incrementPressedOrHeld, actionIncrementHour, SET_TIME_MODE_HR}; // Set HH -> Set HH, increment hour, when Increment Pressed or Held.
+FSM_TRANSITION timeSetHrDecrement = {SET_TIME_MODE_HR, decrementPressedOrHeld, actionDecrementHour, SET_TIME_MODE_HR}; // Set HH -> Set HH, decrement  hour, when Decrement Pressed or Held.
 
-void displayFunctionPCICR() { displayFunction8BitReg(&PCICR); }
+FSM_TRANSITION timeSetMinToDisplayHr = {SET_TIME_MODE_MIN, setPressed, resetSeconds, DISPLAY_HH_MM};                          // Set MM -> HH:MM, when Set Pressed.
+FSM_TRANSITION timeSetMinIncrement   = {SET_TIME_MODE_MIN, incrementPressedOrHeld, actionIncrementMinute, SET_TIME_MODE_MIN}; // Set MM -> Set MM, increment minute, when Increment Pressed or Held.
+FSM_TRANSITION timeSetMinDecrement   = {SET_TIME_MODE_MIN, decrementPressedOrHeld, actionDecrementMinute, SET_TIME_MODE_MIN}; // Set MM -> Set MM, decrement  minute, when Decrement Pressed or Held.
 
-void displayFunctionDDRC() { displayFunctionTwo8BitReg(&DDRC, &PORTC); }
-
-void displayFunctionButtonStates() {
-    ButtonArray *btns = NULL;
-    GetButtons(btns);
-    displayData.data[SEG_FAR_RIGHT] = mapChar(btns[2]->currentState); // Far Right
-    displayData.data[SEG_RIGHT]     = mapChar(btns[1]->currentState); // Centre Right
-    displayData.data[SEG_LEFT]      = mapChar(btns[0]->currentState); // Center Left
-    displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK);                 // Far Left
-}
-
-void displayFunctionCurrentState() {
-    displayData.data[SEG_FAR_RIGHT] = mapChar(stateMachinePtr->currentState); // Far Right -> Current State Index
-    displayData.data[SEG_RIGHT]     = mapChar(triggered ? 9 : 0);             // Center Right -> 9 if triggered, 0 if not.
-    displayData.data[SEG_LEFT]      = mapChar(matches);                       // Centre Left -> FSM Matches for current state.
-    displayData.data[SEG_FAR_LEFT]  = mapChar(transitioned);                  // Far Left -> FSM has transitioned.
-}
-
-volatile uint32_t adcValue = 0;
-void displayFunctionADCValue() {
-    displayData.data[SEG_FAR_RIGHT] = mapChar(adcValue & 0x0F);
-    displayData.data[SEG_RIGHT]     = mapChar((adcValue >> 4) & 0x0F);
-    displayData.data[SEG_LEFT]      = mapChar((adcValue >> 8) & 0x0F);
-    displayData.data[SEG_FAR_LEFT]  = mapChar((adcValue >> 12) & 0x0F);
-}
-
-// Debug Display Functions
-
-/// Finite State Machine
-
-FSM_TRANSITION displayHoursToDisplayMinutes = {DISPLAY_HH_MM, displayPressed, noAction, DISPLAY_MM_SS};
-FSM_TRANSITION displayHoursToSetTime        = {DISPLAY_HH_MM, setPressed, noAction, SET_TIME_MODE_HR};
-FSM_TRANSITION displayHoursToggleTimeMode   = {DISPLAY_HH_MM, displayHeld, actionToggleTimeDisplayModes, DISPLAY_HH_MM};
-
-FSM_TRANSITION displayMinutesToDisplayHours = {DISPLAY_MM_SS, displayPressed, noAction, DISPLAY_HH_MM};
-
-FSM_TRANSITION timeSetHrToMin     = {SET_TIME_MODE_HR, setPressed, noAction, SET_TIME_MODE_MIN};
-FSM_TRANSITION timeSetHrIncrement = {SET_TIME_MODE_HR, incrementPressedOrHeld, actionIncrementHour, SET_TIME_MODE_HR};
-FSM_TRANSITION timeSetHrDecrement = {SET_TIME_MODE_HR, decrementPressed, actionDecrementHour, SET_TIME_MODE_HR};
-
-FSM_TRANSITION timeSetMinToDisplayHr = {SET_TIME_MODE_MIN, setPressed, resetSeconds, DISPLAY_HH_MM};
-FSM_TRANSITION timeSetMinIncrement   = {SET_TIME_MODE_MIN, incrementPressedOrHeld, actionIncrementMinute, SET_TIME_MODE_MIN};
-FSM_TRANSITION timeSetMinDecrement   = {SET_TIME_MODE_MIN, decrementPressed, actionDecrementMinute, SET_TIME_MODE_MIN};
-
-/// Finite State Machine
+/// Finite State Machine Transitions
 
 volatile bool buttonInterruptTriggered = false;
-
-volatile bool shouldUpdateDisplay = false;
-
-DisplayFunctionPointer displayFunctions[FSM_STATE_COUNT] = {displayFunctionTimeHHMM, displayFunctionTimeMMSS, displayFunctionSetTimeHH,
-                                                            displayFunctionTimeMM};
-
+volatile bool shouldUpdateDisplay      = false;
 void toggleDecimalPlaceDisplay() { withDp = !withDp; }
+
+DisplayFunctionPointer displayFunctions[FSM_STATE_COUNT] = {displayFunctionTimeHHMM, displayFunctionTimeMMSS, displayFunctionSetTimeHH, displayFunctionSetTimeMM, displayFunctionAlarmHHMM, displayFunctionSetAlarmHH, displayFunctionSetAlarmMM};
 
 // #define OVERRIDE_DISPLAY_FUNCTION
 
-TimerTask *buzzerDisable = 0;
-
 void disableBuzzer() { disableTimer(TC2); }
 
+uint8_t alarmSetFlags() { return (alarmSetHeld() << 2) | (setHeld() << 1) | (alarmPressed()); }
+
 int main() {
-    if (!initialise())
-        return -1;
+    // Initialise all system components.
+    initialise();
 
+    // Read in configuration for time, clock and state.
     addTime(&clock, 14, 43, 44);
+    addTime(&alarm, 7, 30, 0);
 
+    // Setup the state machine transition table.
     FSM_TRANSITION_TABLE stateMachine = {
-        DISPLAY_HH_MM,
-        {displayHoursToDisplayMinutes, displayHoursToggleTimeMode, displayHoursToSetTime, displayMinutesToDisplayHours, timeSetHrToMin,
-          timeSetHrIncrement, timeSetHrDecrement, timeSetMinToDisplayHr, timeSetMinIncrement, timeSetMinDecrement}
+        DISPLAY_HH_MM, {displayHoursToDisplayMinutes, displayMinutesToDisplayAlarm, displayAlarmToDisplayHHMM, displayHoursToSetAlarm, displayHoursToggleAlarm, displayMinutesToggleAlarm, displayAlarmToggleAlarm, displayHoursToSetTime, timeSetHrToMin,
+                        timeSetMinToDisplayHr, displayHoursToggleTimeMode, timeSetHrIncrement, timeSetHrDecrement, timeSetMinIncrement, timeSetMinDecrement, alarmSetHHToAlarmSetMM, alarmSetHHIncrement, alarmSetHHDecrement,
+                        alarmSetMMToLastDisplayMode, alarmSetMMIncrement, alarmSetMMDecrement}
     };
     stateMachinePtr = &stateMachine;
 
-    // Create a timer task which increments the seconds, once every second.
-    TimerTaskCreate(1000L, actionIncrementSecond, 0, true, false);
-    // Create a timer task which toggle the decimal place display every 500ms.
-    TimerTaskCreate(500L, toggleDecimalPlaceDisplay, 0, true, false);
-
-    // Create a timer task for disabling the buzzer. Runs for 5 seconds,
-    // disables buzzer and then is disabled (because it is created as a 1-shot
-    // task).
-    // buzzerDisable = TimerTaskCreate(5000L, disableBuzzer, 0, false, true);
-
     enableTimers();
 
+    // Enable interrupts.
     sei();
 
 #ifdef OVERRIDE_DISPLAY_FUNCTION
-    displayFunction = displayFunctionCurrentState;
+    displayFunction = displayFunctionAlarmSetFlag;
 #endif
 
     while (1) {
-        // Clear all button inputs flags on major state change.
+        // Update the FSM, and upon a state change clear all button input flags.
         if (FSMUpdate(&stateMachine) == STATE_CHANGE) {
             ButtonClearAllFlags();
         }
@@ -461,14 +566,14 @@ int main() {
 
         if (shouldUpdateDisplay) {
             shouldUpdateDisplay = false;
-            // Need to turn of display
+            // If the ADC reports a maxmimum value, turn the display off. Otherwise call the displayFunction, if set.
             if (adcValue == 0xFF) {
                 displayFunctionBlank();
             } else {
                 if (displayFunction)
                     displayFunction();
             }
-
+            // Push the data to the display.
             SevenSegmentUpdate(displayData.data);
         }
     }

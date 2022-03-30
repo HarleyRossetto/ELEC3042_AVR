@@ -3,9 +3,9 @@
 /**
  *  @brief  Validates the time struct ensuring seconds, minutes and hours overflow correctly when
  *          both incrementing and decrementing.
- * @param time A pointer to the Time type to validate, if null then function returns.
+ * @param time A pointer to the Clock type to validate, if null then function returns.
  */
-void validateTime(volatile Time *time) {
+void validateTime(volatile Clock *time) {
     if (!time)
         return;
 
@@ -46,14 +46,14 @@ void validateTime(volatile Time *time) {
  * @brief Adds hours, minutes and seconds to the target time and validates the result. Handles overflows between all inputs,
  *        and existing values.
  * 
- * @param target A pointer to the target Time type to add the time too.
+ * @param target A pointer to the target Clock type to add the time too.
  * @param hours Hours to add to the time.
  * @param minutes Minutes to add to the time.
  * @param seconds Seconds to add to the time.
  * 
  * @todo Needs to be validated itself, maths appears to be off when subtacting values.
  */
-void addTime(volatile Time *target, int8_t hours, int8_t minutes, int8_t seconds) {
+void addTime(volatile Clock *target, int8_t hours, int8_t minutes, int8_t seconds) {
     if (!target)
         return;
 
@@ -91,29 +91,53 @@ void addTime(volatile Time *target, int8_t hours, int8_t minutes, int8_t seconds
 /**
  * @brief Adds the specified seconds to the target time.
  * 
- * @param target A pointer to the target Time type to add seconds too.
+ * @param target A pointer to the target Clock type to add seconds too.
  * @param seconds The number of seconds to add (or if negative value, subtract).
  */
-void addSeconds(volatile Time *target, int8_t seconds) {
+void addSeconds(volatile Clock *target, int8_t seconds) {
     addTime(target, 0, 0, seconds);
 }
 
 /**
  * @brief Adds the specified minutes to the target time.
  * 
- * @param target A pointer to the target Time type to add seconds too.
+ * @param target A pointer to the target Clock type to add seconds too.
  * @param minutes The number of minutes to add (or if negative value, subtract).
  */
-void addMinutes(volatile Time *target, int8_t minutes) {
+void addMinutes(volatile Clock *target, int8_t minutes) {
     addTime(target, 0, minutes, 0);
 }
 
 /**
  * @brief Adds the specified hours to the target time.
  * 
- * @param target A pointer to the target Time type to add seconds too.
+ * @param target A pointer to the target Clock type to add seconds too.
  * @param hours The number of hours to add (or if negative value, subtract).
  */
-void addHours(volatile Time *target, int8_t hours) {
+void addHours(volatile Clock *target, int8_t hours) {
     addTime(target, hours, 0, 0);
+}
+
+static ClockComparison compare(uint8_t v1, uint8_t v2) {
+    if (v1 > v2)
+        return HIGHER;
+    else if (v1 < v2)
+        return LOWER;
+    else
+        return EQUAL;
+}
+
+ClockComparison compareClocks(volatile Clock *t1, volatile Clock *t2) {
+    if (!t1 || !t2)
+        return LOWER;
+
+    ClockComparison comp = compare(t1->hours, t2->hours);
+    if (comp == EQUAL) {
+        comp = compare(t1->minutes, t2->minutes);
+        if (comp == EQUAL) {
+            return compare(t1->seconds, t2->seconds);
+        }
+        return comp;
+    }
+    return comp;
 }
