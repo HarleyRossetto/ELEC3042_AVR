@@ -20,7 +20,7 @@ FSMUpdateResult FSMUpdate(FSM_TRANSITION_TABLE *table)
             if (transition.trigger())
             {
                 transition.action();
-                table->currentState = transition.nextState;
+                table->currentState = transition.nextState();
                 updateResult = STATE_CHANGE;
                 break;
             }
@@ -39,3 +39,11 @@ bool noEvent() {
 bool noContinue() {
     return false;
 }
+
+FSM_STATE STATE_HH_MM() { return DISPLAY_HH_MM; }
+FSM_STATE STATE_MM_SS() { return DISPLAY_MM_SS; }
+FSM_STATE STATE_MODE_HR() { return SET_TIME_MODE_HR; }
+FSM_STATE STATE_MODE_MIN() { return SET_TIME_MODE_MIN; }
+FSM_STATE STATE_DISP_ALARM() { return DISPLAY_ALARM; }
+FSM_STATE STATE_ALARM_HR() { return ALARM_SET_HR; }
+FSM_STATE STATE_ALARM_MIN() { return ALARM_SET_MIN; }
