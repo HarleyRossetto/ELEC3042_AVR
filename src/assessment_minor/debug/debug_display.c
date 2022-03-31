@@ -67,8 +67,17 @@ void displayFunctionADCValue() {
 
 void displayFunctionAlarmSetFlag() {
     uint8_t flags                   = alarmSetFlags();
-    displayData.data[SEG_FAR_RIGHT] = mapChar(flags & 0x01);                  // Inc Press
+    displayData.data[SEG_FAR_RIGHT] = mapChar(flags & 0x01);        // Inc Press
     displayData.data[SEG_RIGHT]     = mapChar((flags >> 1) & 0x01); // Set Hold
-    displayData.data[SEG_LEFT]      = mapChar((flags >> 2) & 0x01); //Overall
+    displayData.data[SEG_LEFT]      = mapChar((flags >> 2) & 0x01); // Overall
+    displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK);
+}
+
+void displayFunctionSizeOf() {
+    uint8_t size = sizeof(EEPROMData);
+
+    displayData.data[SEG_FAR_RIGHT] = mapChar(size % 10);
+    displayData.data[SEG_RIGHT]     = mapChar(size / 10);
+    displayData.data[SEG_LEFT]      = mapChar(BLANK);
     displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK);
 }

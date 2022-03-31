@@ -42,4 +42,4 @@ bool noEvent();
 bool noContinue();
 FSMUpdateResult FSMUpdate(FSM_TRANSITION_TABLE *table);
 
-#endif
+#endif //FSM_H

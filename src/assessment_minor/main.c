@@ -5,13 +5,17 @@
 #include "button.h"
 #include "clock.h"
 #include "debug/debug_display.h"
+#include "eeprom_data.h"
 #include "fsm.h"
 #include "led.h"
 #include "null.h"
 #include "sevenSegmentDisplay.h"
 #include "systemtimer.h"
+#include "timemode.h"
 #include "timerTask.h"
 #include "timers.h"
+
+// EEPROM
 
 FSM_TRANSITION_TABLE *stateMachinePtr = 0;
 
@@ -23,6 +27,8 @@ FSM_TRANSITION_TABLE *stateMachinePtr = 0;
 #define TIMER2_TICKS_PER_SECOND_64_PRESCALE     F_CPU / 64
 #define TIMER2_TICKS_PER_MILLISEC_64_PRESCALE   TIMER2_TICKS_PER_SECOND_64_PRESCALE / 250
 #define TIMER2_PERIOD_MILLISECONDS              1
+
+#define DISPLAY_CUTOFF                          0x80
 
 void enableTimers() {
     // Primary millisecond counter
@@ -41,8 +47,6 @@ volatile Clock alarm;
 TimerTask *buzzerDisable          = NULL;
 TimerTask *timerTaskBlinkAlarmLed = NULL;
 
-typedef enum { TWELVE_HOUR_TIME, TWENTY_FOUR_HOUR_TIME } TimeMode;
-
 TimeMode timeMode = TWENTY_FOUR_HOUR_TIME;
 
 /// TIMING
@@ -52,6 +56,8 @@ void toggleDecimalPlaceDisplay();
 
 FSMAction actionToggleAlarmLed();
 FSMAction actionIncrementSecond();
+
+FSMAction actionEnableAlarm();
 // Prototypes
 
 LED ledAlarm;
@@ -227,8 +233,7 @@ bool hasDecTimerFired() {
     return false;
 }
 
-FSMAction actionClearButtonsTimersAndFlags() {
-}
+FSMAction actionClearButtonsTimersAndFlags() {}
 
 void initialiseButtons() {
 
@@ -240,6 +245,7 @@ void initialiseButtons() {
 void initialiseTimerTasks() {
     // Create a timer task which increments the seconds, once every second.
     TimerTaskCreate(1000L, actionIncrementSecond, 0, true, false);
+
     // Create a timer task which toggle the decimal place display every 500ms.
     TimerTaskCreate(500L, toggleDecimalPlaceDisplay, 0, true, false);
 
@@ -260,6 +266,33 @@ void initialiseLeds() {
     ledAlarmDisplayIndicator = LED_Create(&DDRB, &PORTB, PB2);
 
     ledDebug = LED_Create(&DDRB, &PORTB, PB5);
+}
+
+void loadDataFromEEPROM(FSM_STATE *currentState, volatile Clock *clk, volatile Clock *alm, volatile bool *almEn, TimeMode *tm) {
+    EEPROMData data = EEPROM_ReadData();
+    clk->hours      = data.timeHour;
+    clk->minutes    = data.timeMinute;
+    clk->seconds    = data.timeSecond;
+
+    Clock_ValidateTime(clk);
+
+    alm->hours   = data.alarmHour;
+    alm->minutes = data.alarmMinute;
+
+    Clock_ValidateTime(alm);
+
+    *almEn = data.alarmEnable;
+    if (*almEn) {
+        actionEnableAlarm();
+    }
+
+    *tm = data.timeMode;
+    *currentState = data.currentState;
+}
+
+void saveDataToEEPROM(FSM_STATE *currentState, volatile Clock *clk, volatile Clock *alm, volatile bool *almEn, TimeMode *tm) {
+    EEPROMData data = {0, clk->hours, clk->minutes, clk->seconds, alm->hours, alm->minutes, *almEn, *currentState, *tm};
+    EEPROM_WriteData(&data);
 }
 
 void initialise() {
@@ -305,29 +338,33 @@ FSMTrigger alarmSetHeld() {
     return res;
 }
 
-FSMTrigger alarmTrigger() { return (compareClocks(&clock, &alarm) == EQUAL) && !alarmSounding; }
+FSMTrigger alarmTrigger() { return (Clock_CompareClocks(&clock, &alarm) == EQUAL) && !alarmSounding; }
 
 // FSM Trigger
 
 // FSM Transition Actions
 
-FSMAction actionIncrementHour() { addHours(&clock, 1); }
+FSMAction actionIncrementHour() { Clock_AddHours(&clock, 1); }
 
-FSMAction actionDecrementHour() { addHours(&clock, -1); }
+FSMAction actionDecrementHour() { Clock_AddHours(&clock, -1); }
 
-FSMAction actionIncrementMinute() { addMinutes(&clock, 1); }
+FSMAction actionIncrementMinute() { Clock_AddMinutes(&clock, 1); }
 
-FSMAction actionDecrementMinute() { addMinutes(&clock, -1); }
+FSMAction actionDecrementMinute() { Clock_AddMinutes(&clock, -1); }
 
-FSMAction actionIncrementSecond() { addSeconds(&clock, 1); }
+bool updateEeprom = false;
+FSMAction actionIncrementSecond() {
+    Clock_AddSeconds(&clock, 1);
+    updateEeprom = true;
+}
 
-FSMAction actionIncrementHourAlarm() { addHours(&alarm, 1); }
+FSMAction actionIncrementHourAlarm() { Clock_AddHours(&alarm, 1); }
 
-FSMAction actionDecrementHourAlarm() { addHours(&alarm, -1); }
+FSMAction actionDecrementHourAlarm() { Clock_AddHours(&alarm, -1); }
 
-FSMAction actionIncrementMinuteAlarm() { addMinutes(&alarm, 1); }
+FSMAction actionIncrementMinuteAlarm() { Clock_AddMinutes(&alarm, 1); }
 
-FSMAction actionDecrementMinuteAlarm() { addMinutes(&alarm, -1); }
+FSMAction actionDecrementMinuteAlarm() { Clock_AddMinutes(&alarm, -1); }
 
 FSMAction actionToggleTimeDisplayModes() { timeMode = (timeMode == TWELVE_HOUR_TIME ? TWENTY_FOUR_HOUR_TIME : TWELVE_HOUR_TIME); }
 
@@ -352,7 +389,7 @@ FSMAction actionAlarmStop() { alarmSounding = false; }
 
 FSM_STATE stateBeforeAlarmMode = DISPLAY_HH_MM;
 FSMAction actionAlarmSetModeEnter() {
-    //Save original state.
+    // Save original state.
     stateBeforeAlarmMode = stateMachinePtr->currentState;
 
     // Clear input timers and button flags
@@ -360,7 +397,7 @@ FSMAction actionAlarmSetModeEnter() {
     TimerTaskReset(timerTaskIncrement);
     ButtonClearFlagsAndForceToReleased();
 
-    //Enable blink for alarm set indicator
+    // Enable blink for alarm set indicator
     timerTaskBlinkAlarmLed->elaspedTime = timerTaskBlinkAlarmLed->period;
     TimerTaskEnable(timerTaskBlinkAlarmLed);
 }
@@ -490,7 +527,7 @@ FSM_TRANSITION displayHoursToDisplayMinutes = {DISPLAY_HH_MM, displayPressed, no
 FSM_TRANSITION displayHoursToSetTime        = {DISPLAY_HH_MM, setPressed, noAction, SET_TIME_MODE_HR};                   // HH:MM -> Set HH when Set Pressed.
 FSM_TRANSITION displayHoursToggleTimeMode   = {DISPLAY_HH_MM, displayHeld, actionToggleTimeDisplayModes, DISPLAY_HH_MM}; // HH:MM -> HH:MM, change 12/24hr mode when Display Held.
 FSM_TRANSITION displayHoursToggleAlarm      = {DISPLAY_HH_MM, incrementPressed, actionToggleAlarm, DISPLAY_HH_MM};       // HH:MM -> HH:MM, enable alarm when Increment Pressed.
-FSM_TRANSITION displayHoursToSetAlarm       = {DISPLAY_HH_MM, alarmSetHeld, actionAlarmSetModeEnter, ALARM_SET_HR};                     // HH:MM -> Set Alarm HH when Alarm Set Held (Set held + Alarm/increment pressed)
+FSM_TRANSITION displayHoursToSetAlarm       = {DISPLAY_HH_MM, alarmSetHeld, actionAlarmSetModeEnter, ALARM_SET_HR};      // HH:MM -> Set Alarm HH when Alarm Set Held (Set held + Alarm/increment pressed)
 
 FSM_TRANSITION alarmSetHHToAlarmSetMM = {ALARM_SET_HR, setPressed, noAction, ALARM_SET_MIN};                            // Alarm Set HH -> Alarm Set MM, when Set Pressed.
 FSM_TRANSITION alarmSetHHIncrement    = {ALARM_SET_HR, incrementPressedOrHeld, actionIncrementHourAlarm, ALARM_SET_HR}; // Alarm Set HH -> Alarm Set HH, increment hour, when Increment Pressed.
@@ -527,15 +564,19 @@ DisplayFunctionPointer displayFunctions[FSM_STATE_COUNT] = {displayFunctionTimeH
 
 void disableBuzzer() { disableTimer(TC2); }
 
-uint8_t alarmSetFlags() { return (alarmSetHeld() << 2) | (setHeld() << 1) | (alarmPressed()); }
+void nukeEeprom() {
+    for (int i = 0; i < 1023; i++) {
+        EEPROM_Update(0xff, i);
+    }
+}
 
 int main() {
     // Initialise all system components.
     initialise();
 
     // Read in configuration for time, clock and state.
-    addTime(&clock, 14, 43, 44);
-    addTime(&alarm, 7, 30, 0);
+    Clock_AddTime(&clock, 14, 43, 44);
+    Clock_AddTime(&alarm, 7, 30, 0);
 
     // Setup the state machine transition table.
     FSM_TRANSITION_TABLE stateMachine = {
@@ -545,13 +586,15 @@ int main() {
     };
     stateMachinePtr = &stateMachine;
 
+    // loadDataFromEEPROM(&stateMachine.currentState, &clock, &alarm, &alarmEnabled, &timeMode);
+
     enableTimers();
 
     // Enable interrupts.
     sei();
 
 #ifdef OVERRIDE_DISPLAY_FUNCTION
-    displayFunction = displayFunctionAlarmSetFlag;
+    displayFunction = displayFunctionADCValue;
 #endif
 
     while (1) {
@@ -567,7 +610,7 @@ int main() {
         if (shouldUpdateDisplay) {
             shouldUpdateDisplay = false;
             // If the ADC reports a maxmimum value, turn the display off. Otherwise call the displayFunction, if set.
-            if (adcValue == 0xFF) {
+            if (adcValue >= DISPLAY_CUTOFF) {
                 displayFunctionBlank();
             } else {
                 if (displayFunction)
@@ -575,6 +618,11 @@ int main() {
             }
             // Push the data to the display.
             SevenSegmentUpdate(displayData.data);
+        }
+
+        if (updateEeprom) {
+            updateEeprom = false;
+            // saveDataToEEPROM(&stateMachinePtr->currentState, &clock, &alarm, &alarmEnabled, &timeMode);
         }
     }
 

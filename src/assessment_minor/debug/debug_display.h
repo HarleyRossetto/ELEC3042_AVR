@@ -7,6 +7,7 @@
 #include "../button.h"
 #include "../null.h"
 #include "../fsm.h"
+#include "../eeprom_data.h"
 
 extern bool transitioned;
 extern uint8_t matches;
@@ -38,5 +39,8 @@ void displayFunctionADCValue();
 
 extern uint8_t alarmSetFlags();
 void displayFunctionAlarmSetFlag();
+
+
+void displayFunctionSizeOf();
 
 #endif // DEBUG_DISPLAY_H

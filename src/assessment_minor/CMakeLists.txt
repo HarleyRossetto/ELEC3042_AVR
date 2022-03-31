@@ -33,6 +33,11 @@ set(SOURCES
         "src/${TARGET}/sevenSegmentDisplay.c"
         "src/${TARGET}/debug/debug_display.h"
         "src/${TARGET}/debug/debug_display.c"
+        "src/${TARGET}/eeprom_alarm.h"
+        "src/${TARGET}/eeprom_alarm.c"
+        "src/${TARGET}/eeprom_data.h"
+        "src/${TARGET}/eeprom_data.c"
+        "src/${TARGET}/timemode.h"
         )
 
 ####################################################################################################

@@ -5,7 +5,7 @@
  *          both incrementing and decrementing.
  * @param time A pointer to the Clock type to validate, if null then function returns.
  */
-void validateTime(volatile Clock *time) {
+void Clock_ValidateTime(volatile Clock *time) {
     if (!time)
         return;
 
@@ -53,7 +53,7 @@ void validateTime(volatile Clock *time) {
  * 
  * @todo Needs to be validated itself, maths appears to be off when subtacting values.
  */
-void addTime(volatile Clock *target, int8_t hours, int8_t minutes, int8_t seconds) {
+void Clock_AddTime(volatile Clock *target, int8_t hours, int8_t minutes, int8_t seconds) {
     if (!target)
         return;
 
@@ -85,7 +85,7 @@ void addTime(volatile Clock *target, int8_t hours, int8_t minutes, int8_t second
     target->minutes += minutes;
     target->hours += hours;
 
-    validateTime(target);
+    Clock_ValidateTime(target);
 }
 
 /**
@@ -94,8 +94,8 @@ void addTime(volatile Clock *target, int8_t hours, int8_t minutes, int8_t second
  * @param target A pointer to the target Clock type to add seconds too.
  * @param seconds The number of seconds to add (or if negative value, subtract).
  */
-void addSeconds(volatile Clock *target, int8_t seconds) {
-    addTime(target, 0, 0, seconds);
+void Clock_AddSeconds(volatile Clock *target, int8_t seconds) {
+    Clock_AddTime(target, 0, 0, seconds);
 }
 
 /**
@@ -104,8 +104,8 @@ void addSeconds(volatile Clock *target, int8_t seconds) {
  * @param target A pointer to the target Clock type to add seconds too.
  * @param minutes The number of minutes to add (or if negative value, subtract).
  */
-void addMinutes(volatile Clock *target, int8_t minutes) {
-    addTime(target, 0, minutes, 0);
+void Clock_AddMinutes(volatile Clock *target, int8_t minutes) {
+    Clock_AddTime(target, 0, minutes, 0);
 }
 
 /**
@@ -114,8 +114,8 @@ void addMinutes(volatile Clock *target, int8_t minutes) {
  * @param target A pointer to the target Clock type to add seconds too.
  * @param hours The number of hours to add (or if negative value, subtract).
  */
-void addHours(volatile Clock *target, int8_t hours) {
-    addTime(target, hours, 0, 0);
+void Clock_AddHours(volatile Clock *target, int8_t hours) {
+    Clock_AddTime(target, hours, 0, 0);
 }
 
 static ClockComparison compare(uint8_t v1, uint8_t v2) {
@@ -127,7 +127,7 @@ static ClockComparison compare(uint8_t v1, uint8_t v2) {
         return EQUAL;
 }
 
-ClockComparison compareClocks(volatile Clock *t1, volatile Clock *t2) {
+ClockComparison Clock_CompareClocks(volatile Clock *t1, volatile Clock *t2) {
     if (!t1 || !t2)
         return LOWER;
 

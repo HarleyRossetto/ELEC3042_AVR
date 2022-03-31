@@ -14,7 +14,11 @@
 			"CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY"
 		},
 		"files.associations": {
-			"timerTask.h": "c"
+			"timerTask.h": "c",
+			"io.h": "c",
+			"iom328p.h": "c",
+			"eeprom_data.h": "c",
+			"bool.h": "c"
 		}
 	},
 	"extensions": {
