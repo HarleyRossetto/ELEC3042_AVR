@@ -38,6 +38,8 @@ set(SOURCES
         "src/${TARGET}/eeprom_data.h"
         "src/${TARGET}/eeprom_data.c"
         "src/${TARGET}/timemode.h"
+        "src/${TARGET}/flag.h"
+        "src/${TARGET}/flag.c"
         )
 
 ####################################################################################################

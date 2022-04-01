@@ -13,3 +13,5 @@ AlignTrailingComments: true
 SpaceBeforeParens: true
 BreakBeforeBraces: Attach
 IndentCaseLabels: true
+PointerAlignment: Right
+ReferenceAlignment: Right

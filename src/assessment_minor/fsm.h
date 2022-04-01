@@ -31,7 +31,7 @@ typedef struct FSM_TRANS
     FSM_STATE (*nextState)();
 } FSM_TRANSITION;
 
-#define FSM_TRANSITION_MAX 23
+#define FSM_TRANSITION_MAX 30
 typedef struct FSM_TRANS_TBL
 {
     FSM_STATE currentState;

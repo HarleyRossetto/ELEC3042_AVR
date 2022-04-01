@@ -13,7 +13,8 @@
 
 #define TIMER2_CLOCK_SELECT_64_PRESCALER (1 << CS22) | (0 << CS21) | (0 << CS20)
 
-#define enableTimer(timer, clockSelect) timer = (timer & 0xF8) | clockSelect
-#define disableTimer(timer)             timer = (timer & 0xF8) | CLOCK_SELECT_NO_SOURCE
+#define enableTimer(timer, clockSelect) (timer = (timer & 0xF8) | clockSelect)
+#define disableTimer(timer)             (timer &= 0xF8)
+#define timerEnabled(timer)             (timer & 0x7)
 
 #endif
