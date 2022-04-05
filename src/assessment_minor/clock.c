@@ -9,26 +9,31 @@ void Clock_ValidateTime(volatile Clock *time) {
     if (!time)
         return;
 
+    // Clear interrupts whilst validating the data.
+    cli();
+
     // Add minute, set seconds to 0
     if (time->seconds == 60) {
-        time->minutes++;
         time->seconds = 0;
+        time->minutes++;
     }
     // Because we are using unsigned values for s/m/h when 'decrementing' the value should overflow (i.e. = 255)
     // Thus if this happens then flip value back to its maximum before an overflow occurs.
     else if (time->seconds > 60) {
         time->seconds = 59;
     }
+
     // Add hour, set minutes to 0.
     if (time->minutes == 60) {
-        time->hours++;
         time->minutes = 0;
+        time->hours++;
     }
     // Because we are using unsigned values for s/m/h when 'decrementing' the value should overflow (i.e. = 255)
     // Thus if this happens then flip value back to its maximum before an overflow occurs.
     else if (time->minutes > 60) {
         time->minutes = 59;
     }
+
     // New day, set all to 0.
     if (time->hours == 24) {
         time->hours   = 0;
@@ -40,6 +45,9 @@ void Clock_ValidateTime(volatile Clock *time) {
     else if (time->hours > 24) {
         time->hours = 23;
     }
+
+    // Restore interrupts
+    sei();
 }
 
 /**

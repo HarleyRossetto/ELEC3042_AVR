@@ -1,7 +1,7 @@
 #include "flag.h"
 
-Flag Flag_Create(void (*callback)(void *arg)) {
-    return (Flag){false, true, callback, NULL};
+Flag Flag_Create(void (*callback)(void *arg), void *callbackArg) {
+    return (Flag){false, true, callback, callbackArg};
 }
 
 bool Flag_RunIfSet(Flag *f) {
@@ -25,6 +25,11 @@ void Flag_Set(Flag *f) {
 void Flag_Clear(Flag *f) {
     if (f)
         f->set = false;
+}
+
+void Flag_Toggle(Flag *f) {
+    if (f)
+        f->set = !f->set;
 }
 
 void Flag_Enable(Flag *f) {

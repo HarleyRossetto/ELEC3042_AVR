@@ -15,6 +15,14 @@
 #define ADC_CH_7 0b0111
 #define ADC_CH_8 0b1000
 
+#define ADC_PRESCALER_32 ((1 << ADPS2) | (0 << ADPS1) | (1 << ADPS0))
+#define ADC_PRESCALER_64 ((1 << ADPS2) | (1 << ADPS1) | (0 << ADPS0))
+#define ADC_PRESCALER_128 ((1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0))
+
 #define ADC_AUTO_TRIGGER_SOURCE_TCC0_COMPARE_MATCH_A ((0 << ADTS2) | (1 << ADTS1) | (1 << ADTS0))
+#define ADC_AUTO_TRIGGER_FREE_RUNNING ((0 << ADTS2) | (0 << ADTS1) | (0 << ADTS0))
+
+// Used for debugging, alias OCR0A (where ADCH is placed upon comparison), vs defining another variable.
+#define ADC_VALUE OCR0A 
 
 #endif // ADC_H

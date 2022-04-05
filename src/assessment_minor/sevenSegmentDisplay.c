@@ -16,7 +16,7 @@ static volatile uint8_t *m_clkIoPort = 0;
 static volatile uint8_t m_shiftPin = 0;
 static volatile uint8_t m_latchPin = 0;
 
-void SevenSegmentInitialise(volatile uint8_t *dataDdr, volatile uint8_t dataPin, volatile uint8_t *dataIoPort, volatile uint8_t *clkDdr, volatile uint8_t *clkIoPort, volatile uint8_t shiftPin, volatile uint8_t latchPin) {
+void InitialiseSevenSegmentDisplay(volatile uint8_t *dataDdr, volatile uint8_t dataPin, volatile uint8_t *dataIoPort, volatile uint8_t *clkDdr, volatile uint8_t *clkIoPort, volatile uint8_t shiftPin, volatile uint8_t latchPin) {
     //Save config regs/ports/pins
     m_dataOutPin = dataPin;
     m_dataIoPort = dataIoPort;

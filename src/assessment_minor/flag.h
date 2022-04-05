@@ -11,13 +11,12 @@ typedef struct {
     void *callbackArg;
 } Flag;
 
-Flag Flag_Create(void(*callback)());
+Flag Flag_Create(void(*callback)(), void*callbackArg);
 bool Flag_RunIfSet(Flag *f);
 void Flag_Set(Flag *f);
 void Flag_Clear(Flag *f);
+void Flag_Toggle(Flag *f);
 void Flag_Enable(Flag *f);
 void Flag_Disable(Flag *f);
-
-
 
 #endif //FLAG_H

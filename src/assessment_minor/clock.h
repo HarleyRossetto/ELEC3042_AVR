@@ -2,6 +2,7 @@
 #define CLOCK_H
 
 #include "stdint.h"
+#include "avr/interrupt.h"
 
 typedef struct  {
     uint8_t hours;

@@ -3,6 +3,8 @@
 
 #include "stdint.h"
 
+extern volatile uint64_t totalMillisecondsElasped;
+
 uint64_t millisecondsElasped();
 void addMillisToSystemCounter(uint64_t millis);
 

@@ -8,6 +8,7 @@
 #include "../null.h"
 #include "../fsm.h"
 #include "../eeprom_data.h"
+#include "../adc.h"
 
 extern bool transitioned;
 extern uint8_t matches;
@@ -34,7 +35,7 @@ void displayFunctionButtonStates();
 
 void displayFunctionCurrentState();
 
-extern volatile uint32_t adcValue;
+
 void displayFunctionADCValue();
 
 extern uint8_t alarmSetFlags();

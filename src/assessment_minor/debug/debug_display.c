@@ -57,12 +57,11 @@ void displayFunctionCurrentState() {
     displayData.data[SEG_FAR_LEFT]  = mapChar(transitioned);                  // Far Left -> FSM has transitioned.
 }
 
-volatile uint32_t adcValue = 0;
 void displayFunctionADCValue() {
-    displayData.data[SEG_FAR_RIGHT] = mapChar(adcValue & 0x0F);
-    displayData.data[SEG_RIGHT]     = mapChar((adcValue >> 4) & 0x0F);
-    displayData.data[SEG_LEFT]      = mapChar((adcValue >> 8) & 0x0F);
-    displayData.data[SEG_FAR_LEFT]  = mapChar((adcValue >> 12) & 0x0F);
+    displayData.data[SEG_FAR_RIGHT] = mapChar(ADC_VALUE & 0x0F);
+    displayData.data[SEG_RIGHT]     = mapChar((ADC_VALUE >> 4) & 0x0F);
+    displayData.data[SEG_LEFT]      = mapChar((ADC_VALUE >> 8) & 0x0F);
+    displayData.data[SEG_FAR_LEFT]  = mapChar((ADC_VALUE >> 12) & 0x0F);
 }
 
 void displayFunctionAlarmSetFlag() {

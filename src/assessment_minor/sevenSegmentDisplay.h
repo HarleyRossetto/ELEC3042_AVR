@@ -26,7 +26,7 @@ typedef union {
 
 typedef uint8_t DisplaySegment;
 
-void SevenSegmentInitialise(volatile uint8_t *dataDdr, uint8_t dataPin, volatile uint8_t *dataIoPort, volatile uint8_t *clkDdr, volatile uint8_t *clkIoPort, uint8_t shiftPin, uint8_t latchPin);
+void InitialiseSevenSegmentDisplay(volatile uint8_t *dataDdr, uint8_t dataPin, volatile uint8_t *dataIoPort, volatile uint8_t *clkDdr, volatile uint8_t *clkIoPort, uint8_t shiftPin, uint8_t latchPin);
 void SevenSegmentUpdate(uint8_t data[4]);
 
 #endif //SEVENSEGMENTDISPLAY_H
