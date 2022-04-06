@@ -226,8 +226,6 @@ Initialiser initialise() {
     initialiseTimerTasks();
     initialiseFlags();
     EEPROM_Initialise();
-    // initialiseStateMachine();
-    initialiseSystemState();
 }
 
 Initialiser initialiseButtons() {
@@ -408,30 +406,6 @@ Initialiser initialiseSystemState() {
         Clock_AddTime(&clock, 12, 0, 0);
         Clock_AddTime(&alarm, 7, 0, 0);
     }
-}
-
-Initialiser initialiseStateMachine() {
-    // Setup the state machine transition table.
-    // Order in which transitions are inserted will determine their priority, this matters for certain transitions (especially silence alarm transitions).
-    stateMachinePtr = &(FSM_TRANSITION_TABLE){
-        DISPLAY_HH_MM,
-        {   // Silence Alarm Transitions - insert first so they may override all other inputs because silencing the alarm takes priority
-            displayHoursSilenceAlarm, alarmSetHHSilenceAlarm, alarmSetMMSilenceAlarm, displayMinutesSilenceAlarm, displayAlarmSilenceAlarm, timeSetHrSilenceAlarm, timeSetMinSilenceAlarm,
-            // Transitions from HH:MM
-            displayHoursToDisplayMinutes, displayHoursToSetAlarm, displayHoursToSetTime, displayHoursToggleTimeMode, displayHoursToggleAlarm,
-            // Transitions from MM:SS
-            displayMinutesToDisplayAlarm, displayAlarmToDisplayHHMM, displayMinutesToSetAlarm, displayMinutesToggleAlarm,
-            // Transitions from Alarm Display
-            displayAlarmToggleAlarm, displayAlarmToSetAlarm,
-            // Transitions from Clock set hours
-            timeSetHrToMin, timeSetHrIncrement, timeSetHrDecrement,
-            // Transitions from Clock set minutes
-            timeSetMinToDisplayHr, timeSetMinIncrement, timeSetMinDecrement,
-            // Transitions from Alarm set hours
-            alarmSetHHToAlarmSetMM, alarmSetHHIncrement, alarmSetHHDecrement,
-            // Transitions from Alarm set minutes
-            alarmSetMMToLastDisplayMode, alarmSetMMIncrement, alarmSetMMDecrement}
-    };
 }
 
 void enableTimers() {
@@ -836,6 +810,8 @@ int main() {
             // Transitions from Alarm set minutes
             alarmSetMMToLastDisplayMode, alarmSetMMIncrement, alarmSetMMDecrement}
     };
+
+    initialiseSystemState();
 
     // Enable timers now that we have done the rest of our configuration.
     enableTimers();
