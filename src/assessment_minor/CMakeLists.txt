@@ -24,7 +24,6 @@ set(SOURCES
         "src/${TARGET}/clock.c"
         "src/${TARGET}/systemtimer.h"
         "src/${TARGET}/systemtimer.c"
-        "src/${TARGET}/eeprom.h"
         "src/${TARGET}/timerTask.h"
         "src/${TARGET}/timerTask.c"
         "src/${TARGET}/led.h"
@@ -33,14 +32,19 @@ set(SOURCES
         "src/${TARGET}/sevenSegmentDisplay.c"
         "src/${TARGET}/debug/debug_display.h"
         "src/${TARGET}/debug/debug_display.c"
-        "src/${TARGET}/eeprom_alarm.h"
-        "src/${TARGET}/eeprom_alarm.c"
-        "src/${TARGET}/eeprom_data.h"
-        "src/${TARGET}/eeprom_data.c"
         "src/${TARGET}/timemode.h"
         "src/${TARGET}/flag.h"
         "src/${TARGET}/flag.c"
+        "src/${TARGET}/eeprom_2.h"
+        "src/${TARGET}/eeprom_2.c"
         )
+
+
+#"src/${TARGET}/eeprom_alarm.h"
+#"src/${TARGET}/eeprom_alarm.c"
+#"src/${TARGET}/eeprom_data.h"
+#"src/${TARGET}/eeprom_data.c"
+#"src/${TARGET}/eeprom.h"
 
 ####################################################################################################
 

@@ -10,7 +10,8 @@ bool Flag_RunIfSet(Flag *f) {
 
     if (f->set && f->enabled) {
         f->set = false;
-        f->callback(f->callbackArg);
+        if (f->callback)
+            f->callback(f->callbackArg);
         return true;
     }
     return false;
@@ -20,6 +21,10 @@ void Flag_Set(Flag *f) {
     if (f) {
         f->set = true;
     }
+}
+
+bool Flag_IsSet(Flag *f) {
+    return (f && f->set);
 }
 
 void Flag_Clear(Flag *f) {

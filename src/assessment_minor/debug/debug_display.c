@@ -72,11 +72,28 @@ void displayFunctionAlarmSetFlag() {
     displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK);
 }
 
-void displayFunctionSizeOf() {
-    uint8_t size = sizeof(EEPROMData);
+void displayFunctionEEpromShow() {
+     displayData.data[SEG_FAR_RIGHT]= mapChar(bytes[3]);
+    displayData.data[SEG_RIGHT]     = mapChar(bytes[2]);
+    displayData.data[SEG_LEFT]      = mapChar(bytes[1]);
+    displayData.data[SEG_FAR_LEFT]  = mapChar(bytes[0]);
+}
 
-    displayData.data[SEG_FAR_RIGHT] = mapChar(size % 10);
-    displayData.data[SEG_RIGHT]     = mapChar(size / 10);
-    displayData.data[SEG_LEFT]      = mapChar(BLANK);
-    displayData.data[SEG_FAR_LEFT]  = mapChar(BLANK);
+
+void displayFunctionClockDataStructData() {
+     displayData.data[SEG_FAR_RIGHT]= mapChar(cd.clockData.timeMode24Hour);
+    displayData.data[SEG_RIGHT]     = mapChar(cd.clockData.alarmEnabled);
+    displayData.data[SEG_LEFT]      = mapChar(cd.clockData.systemState);
+    displayData.data[SEG_FAR_LEFT]  = mapChar(stateMachinePtr->currentState);
+}
+
+
+extern uint16_t readChecksum;
+extern uint16_t writeChecksum;
+extern uint16_t recalChecksum;
+void displayFunctionClockDataStructChecksum() {
+    displayData.data[SEG_FAR_RIGHT] = mapChar(recalChecksum & 0xf);
+    displayData.data[SEG_RIGHT]     = mapChar((recalChecksum >> 8 )& 0xf);
+    displayData.data[SEG_LEFT]      = mapChar(readChecksum & 0xf);
+    displayData.data[SEG_FAR_LEFT]  = mapChar((readChecksum >> 8) & 0xf);
 }

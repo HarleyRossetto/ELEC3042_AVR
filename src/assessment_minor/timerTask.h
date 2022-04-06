@@ -4,7 +4,7 @@
 #include "bool.h"
 #include "stdint.h"
 
-#define MAX_TIMERTASKS 20
+#define MAX_TIMERTASKS 24
 
 typedef void (*Callback)(void *arg);
 typedef void *CallbackArg;

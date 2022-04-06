@@ -7,8 +7,9 @@
 #include "../button.h"
 #include "../null.h"
 #include "../fsm.h"
-#include "../eeprom_data.h"
 #include "../adc.h"
+#include "../eeprom_2.h"
+
 
 extern bool transitioned;
 extern uint8_t matches;
@@ -43,5 +44,13 @@ void displayFunctionAlarmSetFlag();
 
 
 void displayFunctionSizeOf();
+
+extern uint8_t bytes[];
+void displayFunctionEEpromShow();
+
+extern EEPROMReadClockData cd;
+extern FSM_TRANSITION_TABLE *stateMachinePtr;
+void displayFunctionClockDataStructData();
+void displayFunctionClockDataStructChecksum();
 
 #endif // DEBUG_DISPLAY_H

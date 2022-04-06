@@ -14,6 +14,7 @@ typedef struct {
 Flag Flag_Create(void(*callback)(), void*callbackArg);
 bool Flag_RunIfSet(Flag *f);
 void Flag_Set(Flag *f);
+bool Flag_IsSet(Flag *f);
 void Flag_Clear(Flag *f);
 void Flag_Toggle(Flag *f);
 void Flag_Enable(Flag *f);

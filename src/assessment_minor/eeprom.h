@@ -8,8 +8,8 @@
     isReady
 */
 
-uint8_t eepromReadByte(uint8_t *addr);
-uint8_t eepromUpdateByte(uint8_t *addr, uint8_t value);
+uint8_t EEPROM_ReadByte(uint8_t *addr);
+uint8_t EEPROM_UpdateByte(uint8_t *addr, uint8_t value);
 
 
 
