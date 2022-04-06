@@ -30,13 +30,11 @@ set(SOURCES
         "src/${TARGET}/led.c"
         "src/${TARGET}/sevenSegmentDisplay.h"
         "src/${TARGET}/sevenSegmentDisplay.c"
-        "src/${TARGET}/debug/debug_display.h"
-        "src/${TARGET}/debug/debug_display.c"
         "src/${TARGET}/timemode.h"
         "src/${TARGET}/flag.h"
         "src/${TARGET}/flag.c"
-        "src/${TARGET}/eeprom_2.h"
-        "src/${TARGET}/eeprom_2.c"
+        "src/${TARGET}/eeprom.h"
+        "src/${TARGET}/eeprom.c"
         )
 
 

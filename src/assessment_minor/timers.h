@@ -1,3 +1,14 @@
+/**
+ * @file timers.h
+ * @author Harley Rossetto (44618883@students.mq.edu.au)
+ * @brief Macros to help configure the ATmega328p's TCC modules.
+ * @version 0.1
+ * @date 2022-04-06
+ *
+ * @copyright Copyright (c) 2022
+ *
+ */
+
 #ifndef TIMERS_H
 #define TIMERS_H
 
@@ -12,6 +23,9 @@
 #define CLOCK_SELECT_1024_PRESCALER (1 << CS12) | (0 << CS11) | (1 << CS10)
 
 #define TIMER2_CLOCK_SELECT_64_PRESCALER (1 << CS22) | (0 << CS21) | (0 << CS20)
+
+// Waveform Generation Mode - PWM, Phase Correct Mode 11
+#define TC1_TCCR1A_CFG ((1 << WGM11) | (1 << WGM10) | (1 << COM1A1))
 
 #define enableTimer(timer, clockSelect) (timer = (timer & 0xF8) | clockSelect)
 #define disableTimer(timer)             (timer &= 0xF8)

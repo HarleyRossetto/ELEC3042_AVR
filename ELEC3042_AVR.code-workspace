@@ -18,7 +18,8 @@
 			"io.h": "c",
 			"iom328p.h": "c",
 			"eeprom_data.h": "c",
-			"bool.h": "c"
+			"bool.h": "c",
+			"null.h": "c"
 		}
 	},
 	"extensions": {

@@ -1,7 +1,25 @@
+/**
+ * @file fsm.c
+ * @author Harley Rossetto (44618883@students.mq.edu.au)
+ * @brief Finite State Machine abstractions.
+ * @version 0.1
+ * @date 2022-04-06
+ * 
+ * @copyright Copyright (c) 2022
+ * 
+ */
+
 #include "fsm.h"
 
-// Maybe put into a fsm.c file. This implementation is generic enough that we dont
-// need it specified here.
+/**
+ * @brief Heart of the Finite State Machines functioning.
+ * FSMUpdate iterates through all transitions listed in the transition table.
+ * If any transition state matches the systems current state then we will check if it's transition 
+ * trigger is active, if it is we will call the transitions action function before update the system state.
+ * 
+ * @param table 
+ * @return FSMUpdateResult 
+ */
 FSMUpdateResult FSMUpdate(FSM_TRANSITION_TABLE *table)
 {
     FSMUpdateResult updateResult = NO_STATE_CHANGE;
@@ -32,12 +50,8 @@ FSMUpdateResult FSMUpdate(FSM_TRANSITION_TABLE *table)
 
 void noAction() {}
 
-bool noEvent() {
+bool noTrigger() {
     return true;
-}
-
-bool noContinue() {
-    return false;
 }
 
 FSM_STATE STATE_HH_MM() { return DISPLAY_HH_MM; }

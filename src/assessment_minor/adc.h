@@ -1,3 +1,14 @@
+/**
+ * @file adc.h
+ * @author Harley Rossetto (44618883@students.mq.edu.au)
+ * @brief Macros to help configure the ATmega328p's ADC module.
+ * @version 0.1
+ * @date 2022-04-06
+ * 
+ * @copyright Copyright (c) 2022
+ * 
+ */
+
 #ifndef ADC_H
 #define ADC_H
 
@@ -22,7 +33,7 @@
 #define ADC_AUTO_TRIGGER_SOURCE_TCC0_COMPARE_MATCH_A ((0 << ADTS2) | (1 << ADTS1) | (1 << ADTS0))
 #define ADC_AUTO_TRIGGER_FREE_RUNNING ((0 << ADTS2) | (0 << ADTS1) | (0 << ADTS0))
 
-// Used for debugging, alias OCR0A (where ADCH is placed upon comparison), vs defining another variable.
+// Aalias OCR0A (where ADCH is placed upon comparison)
 #define ADC_VALUE OCR0A 
 
 #endif // ADC_H
