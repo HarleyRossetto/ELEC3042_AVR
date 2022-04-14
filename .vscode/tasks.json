@@ -71,6 +71,7 @@
             "description": "Select executable",
             "options": [
                 "main",
+                "assessment_major",
                 "assessment_minor",
                 "week3",
                 "w4p1",
@@ -78,7 +79,7 @@
                 "w4p3",
                 "w5p1"
             ],
-            "default": "assessment_minor"
+            "default": "assessment_major"
         }
     ]
 }
