@@ -55,7 +55,7 @@
 
 // IOCON - I/O Expander Configuration Register
 #define BANK 7
-#define MIRROR 7
+#define MIRROR 6
 #define SEQOP 5
 #define DISSLW 4
 #define HAEN 3

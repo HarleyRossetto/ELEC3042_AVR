@@ -36,6 +36,7 @@ Initialiser initialise() {
     PORTB |= (1 << PB2); // Raise CS
 
     initialiseSPIAsMaster(&DDRB, DDB3, DDB5);
+    MCP23S17_Initialise(); // Must be initialised AFTER SPI.
 
     initialiseFlags();
 
@@ -59,16 +60,17 @@ int main(void) {
 }
 
 Action actionUpdateDisplay() {
-    uint8_t iodira = MCP23S17_ReadRegister(GPIOA);
+    uint8_t iodira = MCP23S17_ReadRegister(IOCON);
     
 
     LCD_Position(LCD_Addr, 0);
-    LCD_Write(LCD_Addr, "IODRA:", 6);
+    LCD_Write(LCD_Addr, "IOCON:", 6);
 
-    // char lower = (iodira & 0xf) + 48;
-    // LCD_Write(LCD_Addr, &lower, 1);
+
     // char higher = ((iodira >> 4) & 0xf) + 48;
     // LCD_Write(LCD_Addr, &higher, 1);
+    // char lower = (iodira & 0xf) + 48;
+    // LCD_Write(LCD_Addr, &lower, 1);
 
 
     for (int i = 7; i >= 0; i-- ) {
