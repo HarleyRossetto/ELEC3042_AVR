@@ -30,6 +30,13 @@ set(SOURCES
         "src/${TARGET}/led.c"
         "src/${TARGET}/flag.h"
         "src/${TARGET}/flag.c"
+        "src/${TARGET}/types.h"
+        "src/${TARGET}/drivers/i2c/display/22S1_ELEC3042_I2C_PCF8574.h"
+        "src/${TARGET}/drivers/i2c/display/22S1_ELEC3042_I2C_PCF8574.c"
+        "src/${TARGET}/drivers/spi/spi.h"
+        "src/${TARGET}/drivers/spi/spi.c"
+        "src/${TARGET}/drivers/mcp23s17/mcp23s17.h"
+        "src/${TARGET}/drivers/mcp23s17/mcp23s17.c"
         )
 
 ####################################################################################################

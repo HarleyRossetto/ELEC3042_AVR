@@ -14,6 +14,7 @@
 #include "stdint.h"
 
 typedef volatile uint8_t *Port;
+typedef volatile Port DDR;
 typedef Port InputRegister;
 typedef uint8_t Pin;
 
