@@ -5,38 +5,38 @@
 #include "../../types.h"
 
 #if defined(BANK_MODE_ONE)
-#define IODRA    0x00
+#define IODIRA    0x00
 #define IPOLA    0x01
 #define GPINTENA 0x02
 #define DEFVALA  0x03
-#define ITCONA   0x04
+#define INTCONA  0x04
 #define IOCON    0x05
 #define GPPUA    0x06
 #define INTFA    0x07
 #define INTCAPA  0x08
 #define GPIOA    0x09
 #define OLATA    0x0A
-#define IODRB    0x10
+#define IODIRB    0x10
 #define IPOLB    0x11
 #define GPINTENB 0x12
 #define DEFVALB  0x13
-#define ITCONB   0x14
+#define INTCONB  0x14
 #define GPPUB    0x16
 #define INTFB    0x17
 #define INTCAPB  0x18
 #define GPIOB    0x19
 #define OLATB    0x1A
 #else
-#define IODRA    0x00
-#define IODRB    0x01
+#define IODIRA    0x00
+#define IODIRB    0x01
 #define IPOLA    0x02
 #define IPOLB    0x03
 #define GPINTENA 0x04
 #define GPINTENB 0x05
 #define DEFVALA  0x06
 #define DEFVALB  0x07
-#define ITCONA   0x08
-#define ITCONB   0x09
+#define INTCONA  0x08
+#define INTCONB  0x09
 #define IOCON    0x0A
 #define GPPUA    0x0C
 #define GPPUB    0x0D
@@ -49,6 +49,9 @@
 #define OLATA    0x14
 #define OLATB    0x15
 #endif
+
+// #define PORTA GPIOA
+// #define PORTB GPIOB
 
 #define READ      1
 #define WRITE     0
@@ -122,9 +125,58 @@
 #define OL1 1
 #define OL0 0
 
+typedef enum { PORT_A, PORT_B } MCP_Port;
 
 Initialiser MCP23S17_Initialise();
 
+// Interrupt Enable/Disable
+void MCP23S17_EnableInterrupt(MCP_Port port, uint8_t pin);
+void MCP23S17_DisableInterrupt(MCP_Port port, uint8_t pin);
+void MCP23S17_WriteInterruptRegister(MCP_Port port, uint8_t reg);
+uint8_t MCP23S17_ReadInterruptRegister(MCP_Port port);
+
+// Interrupt Change Comparision
+void MCP23S17_CompareInterruptAgainstDefaultValue(MCP_Port port, uint8_t pin);
+void MCP23S17_CompareInterruptAgainstPreviousValue(MCP_Port port, uint8_t pin);
+void MCP23S17_WriteInterruptComparisonRegister(MCP_Port port, uint8_t reg);
+uint8_t MCP23S17_ReadInterruptComparisonRegister(MCP_Port port);
+
+// Pull-Up Enable/Disable
+void MCP23S17_EnablePullUp(MCP_Port port, uint8_t pin);
+void MCP23S17_DisablePullUp(MCP_Port port, uint8_t pin);
+void MCP23S17_WritePullUpRegister(MCP_Port port, uint8_t reg);
+uint8_t MCP23S17_ReadPullUpRegister(MCP_Port port);
+
+// Interrupt Flag Register
+uint8_t MCP23S17_ReadInterruptFlagRegister(MCP_Port port);
+
+// Interrupt Flag Capture Register
+uint8_t MCP23S17_ReadInterruptCaptureRegister(MCP_Port port);
+
+// Port Direction
+void MCP23S17_IoDirectionSetPin(MCP_Port port, uint8_t pin);
+void MCP23S17_IoDirectionClearPin(MCP_Port port, uint8_t pin);
+void MCP23S17_IoDirectionAppend(MCP_Port port, uint8_t pin);
+void MCP23S17_IoDirectionClear(MCP_Port port, uint8_t pin);
+void MCP23S17_IoDirectionWrite(MCP_Port port, uint8_t reg);
+uint8_t MCP23S17_IoDirectionRead(MCP_Port port);
+
+// GPIO
+void MCP23S17_GpioSetPin(MCP_Port port, uint8_t pin);
+void MCP23S17_GpioClearPin(MCP_Port port, uint8_t pin);
+void MCP23S17_GpioAppend(MCP_Port port, uint8_t pin);
+void MCP23S17_GpioClear(MCP_Port port, uint8_t pin);
+void MCP23S17_GpioWriteRegister(MCP_Port port, uint8_t reg);
+uint8_t MCP23S17_GpioReadRegister(MCP_Port port);
+
+// Register Bit Modifications
+void MCP23S17_SetBit(uint8_t address, uint8_t bit);
+void MCP23S17_ClearBit(uint8_t address, uint8_t bit);
+void MCP23S17_ToggleBit(uint8_t address, uint8_t bit);
+void MCP23S17_Append(uint8_t address, uint8_t reg);
+void MCP23S17_ClearSpecified(uint8_t address, uint8_t reg);
+
+// Whole register changes
 void MCP23S17_WriteRegister(uint8_t address, uint8_t data);
 uint8_t MCP23S17_ReadRegister(uint8_t address);
 
