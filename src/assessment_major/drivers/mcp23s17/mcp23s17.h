@@ -129,55 +129,79 @@ typedef enum { PORT_A, PORT_B } MCP_Port;
 
 Initialiser MCP23S17_Initialise();
 
-// Interrupt Enable/Disable
-void MCP23S17_EnableInterrupt(MCP_Port port, uint8_t pin);
-void MCP23S17_DisableInterrupt(MCP_Port port, uint8_t pin);
-void MCP23S17_WriteInterruptRegister(MCP_Port port, uint8_t reg);
-uint8_t MCP23S17_ReadInterruptRegister(MCP_Port port);
+////////////////////////////////////////////////////////////////////////////////
+///                  Interrupt Enable Register Manipulation                   //
+////////////////////////////////////////////////////////////////////////////////
+void MCP23S17_InterruptEnable(MCP_Port port, uint8_t pin);
+void MCP23S17_InterruptDisable(MCP_Port port, uint8_t pin);
+void MCP23S17_InterruptEnableSetRegister(MCP_Port port, uint8_t reg);
+void MCP23S17_PullUpAppendRegister(MCP_Port port, uint8_t reg);
+void MCP23S17_PullUpClearRegister(MCP_Port port, uint8_t reg);
+uint8_t MCP23S17_InterruptReadRegister(MCP_Port port);
 
-// Interrupt Change Comparision
-void MCP23S17_CompareInterruptAgainstDefaultValue(MCP_Port port, uint8_t pin);
-void MCP23S17_CompareInterruptAgainstPreviousValue(MCP_Port port, uint8_t pin);
-void MCP23S17_WriteInterruptComparisonRegister(MCP_Port port, uint8_t reg);
-uint8_t MCP23S17_ReadInterruptComparisonRegister(MCP_Port port);
+////////////////////////////////////////////////////////////////////////////////
+///                  Interrupt-On-Change Register Manipulation                //
+////////////////////////////////////////////////////////////////////////////////
+void MCP23S17_InterruptOnChangeSetBit(MCP_Port port, uint8_t pin);
+void MCP23S17_InterruptOnChangeClearBit(MCP_Port port, uint8_t pin);
+void MCP23S17_InterruptOnChangeSetRegister(MCP_Port port, uint8_t reg);
+void MCP23S17_PullUpAppendRegister(MCP_Port port, uint8_t reg);
+void MCP23S17_PullUpClearRegister(MCP_Port port, uint8_t reg);
+uint8_t MCP23S17_InterruptOnChangeReadRegister(MCP_Port port);
 
-// Pull-Up Enable/Disable
-void MCP23S17_EnablePullUp(MCP_Port port, uint8_t pin);
-void MCP23S17_DisablePullUp(MCP_Port port, uint8_t pin);
-void MCP23S17_WritePullUpRegister(MCP_Port port, uint8_t reg);
-uint8_t MCP23S17_ReadPullUpRegister(MCP_Port port);
+////////////////////////////////////////////////////////////////////////////////
+///                  Pull-Up Resistor Register Manipulation                   //
+////////////////////////////////////////////////////////////////////////////////
+void MCP23S17_PullUpSetBit(MCP_Port port, uint8_t pin);
+void MCP23S17_PullUpClearBit(MCP_Port port, uint8_t pin);
+void MCP23S17_PullUpSetRegister(MCP_Port port, uint8_t reg);
+void MCP23S17_PullUpAppendRegister(MCP_Port port, uint8_t reg);
+void MCP23S17_PullUpClearRegister(MCP_Port port, uint8_t reg);
+uint8_t MCP23S17_PullUpReadRegister(MCP_Port port);
 
-// Interrupt Flag Register
-uint8_t MCP23S17_ReadInterruptFlagRegister(MCP_Port port);
+////////////////////////////////////////////////////////////////////////////////
+///                     Interrupt Flag Register Read                          //
+////////////////////////////////////////////////////////////////////////////////
+uint8_t MCP23S17_InterruptFlagReadRegister(MCP_Port port);
 
-// Interrupt Flag Capture Register
-uint8_t MCP23S17_ReadInterruptCaptureRegister(MCP_Port port);
+////////////////////////////////////////////////////////////////////////////////
+///                    Interrupt Flag Capture Register                        //
+////////////////////////////////////////////////////////////////////////////////
+uint8_t MCP23S17_InterruptCaptureReadRegister(MCP_Port port);
 
-// Port Direction
+////////////////////////////////////////////////////////////////////////////////
+///                    IO Direction Register Manipulation                     //
+////////////////////////////////////////////////////////////////////////////////
 void MCP23S17_IoDirectionSetPin(MCP_Port port, uint8_t pin);
 void MCP23S17_IoDirectionClearPin(MCP_Port port, uint8_t pin);
-void MCP23S17_IoDirectionAppend(MCP_Port port, uint8_t pin);
-void MCP23S17_IoDirectionClear(MCP_Port port, uint8_t pin);
-void MCP23S17_IoDirectionWrite(MCP_Port port, uint8_t reg);
+void MCP23S17_IoDirectionAppendRegister(MCP_Port port, uint8_t reg);
+void MCP23S17_IoDirectionClearRegister(MCP_Port port, uint8_t reg);
+void MCP23S17_IoDirectionWriteRegister(MCP_Port port, uint8_t reg);
 uint8_t MCP23S17_IoDirectionRead(MCP_Port port);
 
-// GPIO
+////////////////////////////////////////////////////////////////////////////////
+///                         GPIO Register Manipulation                        //
+////////////////////////////////////////////////////////////////////////////////
 void MCP23S17_GpioSetPin(MCP_Port port, uint8_t pin);
 void MCP23S17_GpioClearPin(MCP_Port port, uint8_t pin);
-void MCP23S17_GpioAppend(MCP_Port port, uint8_t pin);
-void MCP23S17_GpioClear(MCP_Port port, uint8_t pin);
+void MCP23S17_GpioAppendRegister(MCP_Port port, uint8_t pin);
+void MCP23S17_GpioClearRegister(MCP_Port port, uint8_t reg);
 void MCP23S17_GpioWriteRegister(MCP_Port port, uint8_t reg);
 uint8_t MCP23S17_GpioReadRegister(MCP_Port port);
 
-// Register Bit Modifications
+////////////////////////////////////////////////////////////////////////////////
+///                    Register Bit Manipulation Utilities                    //
+////////////////////////////////////////////////////////////////////////////////
 void MCP23S17_SetBit(uint8_t address, uint8_t bit);
 void MCP23S17_ClearBit(uint8_t address, uint8_t bit);
 void MCP23S17_ToggleBit(uint8_t address, uint8_t bit);
 void MCP23S17_Append(uint8_t address, uint8_t reg);
 void MCP23S17_ClearSpecified(uint8_t address, uint8_t reg);
 
-// Whole register changes
-void MCP23S17_WriteRegister(uint8_t address, uint8_t data);
+////////////////////////////////////////////////////////////////////////////////
+///                         Register Reading.Writing                          //
+////////////////////////////////////////////////////////////////////////////////
+void MCP23S17_SetRegister(uint8_t address, uint8_t data);
 uint8_t MCP23S17_ReadRegister(uint8_t address);
 
 #endif // MCP23S17_H

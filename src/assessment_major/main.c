@@ -42,8 +42,8 @@ Initialiser initialise() {
 
     Flag_Set(&flag_UpdateDisplay);
     
-    MCP23S17_WriteRegister(0x00, 0x00);
-    MCP23S17_WriteRegister(GPIOA, 0b10001000);
+    MCP23S17_SetRegister(0x00, 0x00);
+    MCP23S17_SetRegister(GPIOA, 0b10001000);
 }
 
 Initialiser initialiseFlags() { flag_UpdateDisplay = Flag_Create(&actionUpdateDisplay, NULL); }
