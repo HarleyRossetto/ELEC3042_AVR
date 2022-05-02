@@ -14,12 +14,9 @@
 
 #include "iotypes.h"
 
-typedef enum { OFF, ON } LED_State;
-
 typedef struct {
     Port port;
     Pin pin;
-    LED_State state;
 } LED;
 
 /**

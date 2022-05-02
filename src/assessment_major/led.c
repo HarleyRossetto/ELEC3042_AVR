@@ -21,7 +21,7 @@
  */
 LED LED_Create(Port ddr, Port port, Pin pin) {
     *ddr |= (1 << pin);
-    LED led = {port, pin, OFF};
+    LED led = {port, pin};
     LED_Off(&led);
     return led;
 }
@@ -34,8 +34,7 @@ LED LED_Create(Port ddr, Port port, Pin pin) {
 void LED_On(LED *led) {
     if (!led)
         return;
-    led->state = ON;
-    *led->port &= ~(1 << led->pin);
+    *led->port |= (1 << led->pin);
 }
 
 /**
@@ -46,8 +45,7 @@ void LED_On(LED *led) {
 void LED_Off(LED *led) {
     if (!led)
         return;
-    led->state = OFF;
-    *led->port |= (1 << led->pin);
+    *led->port &= ~(1 << led->pin);
 }
 
 /**
@@ -58,6 +56,5 @@ void LED_Off(LED *led) {
 void LED_Toggle(LED *led) {
     if (!led)
         return;
-    led->state = !led->state;
     *led->port ^= (1 << led->pin);
 }
