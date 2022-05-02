@@ -5,7 +5,7 @@
 #include "../../types.h"
 
 #if defined(BANK_MODE_ONE)
-#define IODIRA    0x00
+#define IODIRA   0x00
 #define IPOLA    0x01
 #define GPINTENA 0x02
 #define DEFVALA  0x03
@@ -16,7 +16,7 @@
 #define INTCAPA  0x08
 #define GPIOA    0x09
 #define OLATA    0x0A
-#define IODIRB    0x10
+#define IODIRB   0x10
 #define IPOLB    0x11
 #define GPINTENB 0x12
 #define DEFVALB  0x13
@@ -27,8 +27,8 @@
 #define GPIOB    0x19
 #define OLATB    0x1A
 #else
-#define IODIRA    0x00
-#define IODIRB    0x01
+#define IODIRA   0x00
+#define IODIRB   0x01
 #define IPOLA    0x02
 #define IPOLB    0x03
 #define GPINTENA 0x04
@@ -49,9 +49,6 @@
 #define OLATA    0x14
 #define OLATB    0x15
 #endif
-
-// #define PORTA GPIOA
-// #define PORTB GPIOB
 
 #define READ      1
 #define WRITE     0
@@ -125,7 +122,9 @@
 #define OL1 1
 #define OL0 0
 
-typedef enum { PORT_A, PORT_B } MCP_Port;
+typedef enum { MCP_PORT_A, MCP_PORT_B } MCP_Port;
+
+#define MCP23S17_InterruptEnable_PortA(pin) MCP23S17_InterruptEnable(MCP_PORT_A, pin);
 
 Initialiser MCP23S17_Initialise();
 
@@ -176,17 +175,18 @@ void MCP23S17_IoDirectionSetPin(MCP_Port port, uint8_t pin);
 void MCP23S17_IoDirectionClearPin(MCP_Port port, uint8_t pin);
 void MCP23S17_IoDirectionAppendRegister(MCP_Port port, uint8_t reg);
 void MCP23S17_IoDirectionClearRegister(MCP_Port port, uint8_t reg);
-void MCP23S17_IoDirectionWriteRegister(MCP_Port port, uint8_t reg);
-uint8_t MCP23S17_IoDirectionRead(MCP_Port port);
+void MCP23S17_IoDirectionSetRegister(MCP_Port port, uint8_t reg);
+uint8_t MCP23S17_IoDirectionReadRegister(MCP_Port port);
 
 ////////////////////////////////////////////////////////////////////////////////
 ///                         GPIO Register Manipulation                        //
 ////////////////////////////////////////////////////////////////////////////////
 void MCP23S17_GpioSetPin(MCP_Port port, uint8_t pin);
 void MCP23S17_GpioClearPin(MCP_Port port, uint8_t pin);
+void MCP23S17_GpioTogglePin(MCP_Port port, uint8_t pin);
 void MCP23S17_GpioAppendRegister(MCP_Port port, uint8_t pin);
 void MCP23S17_GpioClearRegister(MCP_Port port, uint8_t reg);
-void MCP23S17_GpioWriteRegister(MCP_Port port, uint8_t reg);
+void MCP23S17_GpioSetRegister(MCP_Port port, uint8_t reg);
 uint8_t MCP23S17_GpioReadRegister(MCP_Port port);
 
 ////////////////////////////////////////////////////////////////////////////////
