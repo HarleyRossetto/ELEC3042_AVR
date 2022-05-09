@@ -14,12 +14,13 @@
 #define	PORT(x)	PORT ## x
 // Sparkfun can_bus Library
 
+#define SPI_CLOCK_RATE_2    SPI_CLOCK_RATE_4
 #define SPI_CLOCK_RATE_4    (0 << SPR1) | (0 << SPR0)
 #define SPI_CLOCK_RATE_16   (0 << SPR1) | (1 << SPR0)
 #define SPI_CLOCK_RATE_64   (1 << SPR1) | (0 << SPR0)
 #define SPI_CLOCK_RATE_128  (1 << SPR1) | (1 << SPR0)
 
-Initialiser initialiseSPIAsMaster(DDR spiDdr, Pin mosi, Pin sck);
+Initialiser initialiseSPIAsMaster();
 void SPI_EnableTransferCompleteInterrupt();
 void SPI_DisableTransferCompleteInterrupt();
 

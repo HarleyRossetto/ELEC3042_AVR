@@ -122,6 +122,16 @@
 #define OL1 1
 #define OL0 0
 
+// INTCP
+#define ICP7 7
+#define ICP6 6
+#define ICP5 5
+#define ICP4 4
+#define ICP3 3
+#define ICP2 2
+#define ICP1 1
+#define ICP0 0
+
 typedef enum { MCP_PORT_A, MCP_PORT_B } MCP_Port;
 
 #define MCP23S17_InterruptEnable_PortA(pin) MCP23S17_InterruptEnable(MCP_PORT_A, pin);

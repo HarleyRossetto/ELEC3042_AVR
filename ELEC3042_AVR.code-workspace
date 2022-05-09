@@ -19,7 +19,10 @@
 			"iom328p.h": "c",
 			"eeprom_data.h": "c",
 			"bool.h": "c",
-			"null.h": "c"
+			"null.h": "c",
+			"types.h": "c",
+			"led.h": "c",
+			"mcp23s17.h": "c"
 		}
 	},
 	"extensions": {

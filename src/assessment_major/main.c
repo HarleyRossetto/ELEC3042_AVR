@@ -3,9 +3,9 @@
 #include "bool.h"
 #include "drivers/i2c/display/22S1_ELEC3042_I2C_PCF8574.h"
 #include "drivers/mcp23s17/mcp23s17.h"
-#include "drivers/spi/spi.h"
 #include "flag.h"
-#include "led.h"
+#include "intersection/light.h"
+#include "intersection/trafficLight.h"
 #include "null.h"
 #include "stdint.h"
 #include "timerTask.h"
@@ -18,38 +18,6 @@ typedef enum { BROADWAY_STRAIGHT, BROADWAY_TURN, LITTLE_STREET, PEDESTRIANS, HAZ
 const char phaseStrings[][3] = {"BRS", "BRT", "LIT", "PED", "HAZ"};
 
 Phase phase;
-
-typedef enum { Internal, External } LightLocation;
-
-typedef enum { RED, YELLOW, GREEN} TrafficLightState;
-
-typedef struct {
-    uint8_t port; // Subtract 0x12 to obtain IODIR port address when in BANK mode. Otherwise subtract 0x09.
-    uint8_t pin;
-} ExternalLight;
-
-typedef struct {
-    Port port;
-    uint8_t pin;
-} InternalLight;
-
-typedef struct {
-    LightLocation interfaceLocation;
-    ExternalLight externalInterface;
-    InternalLight internalInterface;
-} Light;
-
-typedef struct {
-    Light red;
-    Light yellow;
-    Light green;
-    TrafficLightState activeLight;
-} TrafficLight;
-
-void trafficLight_Green(TrafficLight *light);
-void trafficLight_Yellow(TrafficLight *light);
-void trafficLight_Red(TrafficLight *light);
-void trafficLight_Hazard(TrafficLight *light);
 
 TrafficLight tl_Broadway_North;
 TrafficLight tl_Broadway_South;
@@ -66,7 +34,8 @@ volatile uint16_t periodCounter = 0;
 
 TimerTask *tt_period;
 TimerTask *tt_updateDisplay;
-TimerTask **tt_hazardCycle;
+TimerTask *tt_hazardCycle;
+TimerTask *tt_hazardCancel;
 /// ^^^^^ PROTOTYPES
 
 /**
@@ -78,6 +47,7 @@ Initialiser initialiseFlags();
 Initialiser initialiseMCP23S17();
 Initialiser initialiseTrafficLights();
 Initialiser initialiseTimerTasks();
+Initialiser initialiseInterrupt0();
 
 Action actionUpdateStatusDisplay();
 Action actionUpdateDisplay(); // Debug
@@ -92,6 +62,8 @@ void ttPeriodElasped();
 
 void pwrSave();
 
+uint32_t millisecondsElasped = 0;
+
 /**
  * Flag declarations
  */
@@ -99,8 +71,6 @@ void pwrSave();
 Flag flag_UpdateTimers;
 Flag flag_UpdateDisplay;
 Flag flag_CheckButtonInterrupts;
-
-LED debugLed;
 
 /*
     Keeps track of how many times the milliseconds timer/counter (TCC2) is triggered.
@@ -116,35 +86,33 @@ Initialiser initialise() {
     setup_I2C();
     setup_LCD(LCD_Addr);
 
-    // Enable interrupts on INT0
-    EIMSK = (1 << INT0);
-    // Respond to any logic level change on INT0
-    EICRA = (0 << ISC01) | (1 << ISC00);
+    initialiseInterrupt0();
 
-    // Flags
     initialiseFlags();
-
     Flag_Set(&flag_UpdateDisplay);
-
-    // LED
-    debugLed = LED_Create(&DDRB, &PORTB, PB0);
 
     initialiseMCP23S17();
 
-    phase = HAZARD;
-
     initialiseTrafficLights();
     initialiseTimerTasks();
+
+    // Internal LED
+    DDRD |= (1 << DDD6) | (1 << DDD5);
+
+    // Hazard Interrupt Not really worth it is it?
+    // PCMSK0 |= (1 << PC3); // D3/Pin 18
+    // PCICR |= (1 << PCIE0);
+    // Hazard Pull-up
+    DDRD &= ~(1 << DDD3);
+    PORTD |= (1 << PD3);
+
+    phase = HAZARD;
 }
 
 Initialiser initialiseMCP23S17() {
-    // Enable Chip Select as output
-    DDRB |= (1 << DDB2);
-    PORTB |= (1 << PB2); // Raise CS
 
-    // Initialise SPI and MCP23S17 consumer.
-    initialiseSPIAsMaster(&DDRB, DDB3, DDB5);
-    MCP23S17_Initialise(); // Must be initialised AFTER SPI.
+    // Initialise MCP23S17, initialiser handles SPI configuration.
+    MCP23S17_Initialise();
 
     // Initialise Port A
     MCP23S17_IoDirectionSetRegister(MCP_PORT_A, 0b00010001);
@@ -201,33 +169,55 @@ Initialiser initialiseTrafficLights() {
         (Light){External, (ExternalLight){MCP_PORT_B, GP3}, {NULL}}
     };
     tl_Broadway_Pedestrian = (TrafficLight){
-        (Light){Internal, {NULL}, (InternalLight){&PORTD, PD6}},
-        (Light){Internal, {NULL}, (InternalLight){&PORTD, PD6}}, // Duplicate red light to yellow so it becomes our hazard light too.
         (Light){Internal, {NULL}, (InternalLight){&PORTD, PD5}},
+        (Light){Internal, {NULL}, (InternalLight){&PORTD, PD5}}, // Duplicate red light to yellow so it becomes our hazard light too.
+        (Light){Internal, {NULL}, (InternalLight){&PORTD, PD6}},
     };
 }
 
-void cycleAllLights() { 
-    cycleLight(&tl_Broadway_North); 
-    cycleLight(&tl_Broadway_South); 
-    cycleLight(&tl_Broadway_South_Turn); 
-    cycleLight(&tl_Little_Street); 
-    cycleLight(&tl_Broadway_Pedestrian); 
+Initialiser initialiseInterrupt0() {
+    // Enable interrupts on INT0
+    EIMSK = (1 << INT0);
+    // Respond to any logic level change on INT0
+    EICRA = (0 << ISC01) | (1 << ISC00);
+}
+
+void cycleAllLights() {
+    cycleLight(&tl_Broadway_North);
+    cycleLight(&tl_Broadway_South);
+    cycleLight(&tl_Broadway_South_Turn);
+    cycleLight(&tl_Little_Street);
+    cycleLight(&tl_Broadway_Pedestrian);
 }
 
 void hazardState() {
-    trafficLight_Hazard(&tl_Broadway_North); 
-    trafficLight_Hazard(&tl_Broadway_South); 
-    trafficLight_Hazard(&tl_Broadway_South_Turn); 
-    trafficLight_Hazard(&tl_Little_Street); 
-    trafficLight_Hazard(&tl_Broadway_Pedestrian); 
+    TrafficLight_Hazard(&tl_Broadway_North);
+    TrafficLight_Hazard(&tl_Broadway_South);
+    TrafficLight_Hazard(&tl_Broadway_South_Turn);
+    TrafficLight_Hazard(&tl_Little_Street);
+    TrafficLight_Hazard(&tl_Broadway_Pedestrian);
+}
+
+void clearAllLights() {
+    TrafficLight_Blank(&tl_Broadway_North);
+    TrafficLight_Blank(&tl_Broadway_South);
+    TrafficLight_Blank(&tl_Broadway_South_Turn);
+    TrafficLight_Blank(&tl_Little_Street);
+    TrafficLight_Blank(&tl_Broadway_Pedestrian);
+}
+
+void endHazardState() {
+    TimerTaskDisable(tt_hazardCycle);
+    clearAllLights();
+    TrafficLight_Set(&tl_Broadway_Pedestrian.green);
 }
 
 Initialiser initialiseTimerTasks() {
-    //tt_lightCycle = TimerTaskCreate(1000L, &cycleAllLights, NULL, true, false);
-    tt_period     = TimerTaskCreate(200L, &ttPeriodElasped, NULL, true, false);
-    tt_hazardCycle   = TimerTaskCreate(1000L, &hazardState, NULL, true, false);
-    tt_updateDisplay = TimerTaskCreate(500L, &Flag_Set, &flag_UpdateDisplay, true, false);
+    // tt_lightCycle = TimerTaskCreate(1000L, &cycleAllLights, NULL, true, false);
+    tt_period        = TimerTaskCreate(1000L, &ttPeriodElasped, NULL, true, false);
+    tt_hazardCycle   = TimerTaskCreate(500L, &hazardState, NULL, true, false);
+    tt_updateDisplay = TimerTaskCreate(100L, &Flag_Set, &flag_UpdateDisplay, true, false);
+    tt_hazardCancel  = TimerTaskCreate(10000L, &endHazardState, NULL, false, true);
 }
 
 void enableTimers() {
@@ -240,7 +230,15 @@ void updateTimers() {
     timer2InterruptCount = 0;
 }
 
-void ttPeriodElasped() { periodCounter++; }
+void ttPeriodElasped() { 
+    periodCounter++; 
+    if (periodCounter > 99999)
+        periodCounter = 0;
+}
+
+typedef enum { SS_HAZARD, SS_NORMAL } SystemState;
+
+SystemState ss = SS_HAZARD;
 
 int main(void) {
     initialise();
@@ -254,12 +252,24 @@ int main(void) {
     sei();
 
     while (1) {
+        // If no hazard signal
+        if (PIND & (1 << PIND3)) {
+            if (!tt_hazardCancel->enabled && ss == SS_HAZARD) {
+                periodCounter = 0;
+                ss            = SS_NORMAL;
+                TimerTaskReset(tt_hazardCancel);
+                TimerTaskEnable(tt_hazardCancel);
+            }
+        } else { // Hazard signal
+            ss = SS_HAZARD;
+            TimerTaskEnable(tt_hazardCycle);
+            TrafficLight_Clear(&tl_Broadway_Pedestrian.green);
+        }
+
         // Update timed tasks.
         Flag_RunIfSet(&flag_UpdateTimers);
 
         Flag_RunIfSet(&flag_UpdateDisplay);
-        // actionUpdateDisplay();
-        //  actionUpdateStatusDisplay();
 
         Flag_RunIfSet(&flag_CheckButtonInterrupts);
 
@@ -276,15 +286,37 @@ int main(void) {
 // as possible by avoid i2c transfers.
 //
 // Batch all the data into rows to limit i2c calls potentially?
+const uint8_t delay = 10;
+
+typedef struct {
+    uint32_t lastTime;
+    bool state;
+} Sensor;
+#define PRESSED 1
+#define RELEASED 0
+
+char sensorStateChar(Sensor *b) { return b->state ? 'X' : 'O'; }
+
+Sensor sensor0 = {0, RELEASED};
+Sensor sensor1 = {0, RELEASED};
+Sensor sensor2 = {0, RELEASED};
+Sensor sensor3 = {0, RELEASED};
+Sensor sensor4 = {0, RELEASED};
+Sensor sensor5 = {0, RELEASED};
+Sensor sensor6 = {0, RELEASED};
+
+char portAFlagsDisplay[8] = {48, 48, 48, 48, 48, 48, 48, 48};
+
 Action actionUpdateStatusDisplay() {
     // Row row initially all spaces.
     char topRow[16] = {0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20};
-    topRow[0]       = 'O';
-    topRow[1]       = 'O';
-    topRow[2]       = 'X';
-    topRow[3]       = 'O';
-    topRow[4]       = 'O';
-    topRow[5]       = 'O';
+    topRow[0]       = sensorStateChar(&sensor0);
+    topRow[1]       = sensorStateChar(&sensor1);
+    topRow[2]       = sensorStateChar(&sensor2);
+    topRow[3]       = sensorStateChar(&sensor3);
+    topRow[4]       = sensorStateChar(&sensor4);
+    topRow[5]       = sensorStateChar(&sensor5);
+    // topRow[6]       = sensorStateChar(s6);
 
     uint16_t period = periodCounter;
     for (int i = 4; i >= 0; i--) {
@@ -297,7 +329,8 @@ Action actionUpdateStatusDisplay() {
 
     LCD_Position(LCD_Addr, 0x40);                 // Bottom left first character position
     LCD_Write(LCD_Addr, &phaseStrings[phase], 3); // Write System Phase.
-    LCD_Write(LCD_Addr, "R", 1);                  // Write phase color
+    LCD_Write(LCD_Addr, "Y ", 2);                  // Write phase color
+    LCD_Write(LCD_Addr, &portAFlagsDisplay, 8);
 }
 
 Action actionUpdateDisplay() {
@@ -322,136 +355,50 @@ Action actionUpdateDisplay() {
     }
 }
 
+// Determines if sensor is pressed or not.
+inline void
+sensor(uint8_t flags, uint8_t changeBits, uint8_t pin, Sensor *sensor) {
+    if (millisecondsElasped - sensor->lastTime < delay) {
+        return;
+    }
+
+    sensor->lastTime = millisecondsElasped;
+    if (flags & (1 << pin)) {
+        if (changeBits & (1 << pin)) // Logic level high if left unpressed.
+            sensor->state = RELEASED;
+        else
+            sensor->state = PRESSED;
+    }
+}
+
 Action actionCheckButtonInterrupts() {
-    MCP23S17_ToggleBit(GPIOA, GP7);
-    LCD_Position(LCD_Addr, 0x40);
-    LCD_Write(LCD_Addr, "x", 1);
-}
 
-void clearLight_Internal(InternalLight *light) {
-    if (!light)
-        return;
+    uint8_t portAFlags = MCP23S17_InterruptFlagReadRegister(MCP_PORT_A);
 
-    *light->port &= ~(1 << light->pin);
-}
+    if (portAFlags) {
+        uint8_t portAChangeBits = MCP23S17_InterruptCaptureReadRegister(MCP_PORT_A);
+         // Sensor 1
+        sensor(portAFlags, portAChangeBits, ICP4, &sensor1);
 
-void setLight_Internal(InternalLight *light) {
-    if (!light)
-        return;
-
-    *light->port |= (1 << light->pin);
-}
-
-void toggleLight_Internal(InternalLight *light) {
-    if (!light)
-        return;
-
-    *light->port ^= (1 << light->pin);
-}
-
-void clearLight_External(ExternalLight *light) {
-    if (!light)
-        return;
-
-    MCP23S17_GpioClearPin(light->port, light->pin);
-}
-
-void setLight_External(ExternalLight *light) {
-    if (!light)
-        return;
-
-    MCP23S17_GpioSetPin(light->port, light->pin);
-}
-
-void toggleLight_External(ExternalLight *light) {
-    if (!light)
-        return;
-
-    MCP23S17_GpioTogglePin(light->port, light->pin);
-}
-
-void clearLight(Light *light) {
-    if (!light)
-        return;
-
-    if (light->interfaceLocation == Internal) {
-        clearLight_Internal(&light->internalInterface);
-    } else if (light->interfaceLocation == External) {
-        clearLight_External(&light->externalInterface);
+        // Sensor 0
+        sensor(portAFlags, portAChangeBits, ICP0, &sensor0);
     }
-}
 
-void setLight(Light *light) {
-    if (!light)
-        return;
+    uint8_t portBFlags = MCP23S17_InterruptFlagReadRegister(MCP_PORT_B);
 
-    if (light->interfaceLocation == Internal) {
-        setLight_Internal(&light->internalInterface);
-    } else if (light->interfaceLocation == External) {
-        setLight_External(&light->externalInterface);
+    if (portBFlags) {
+        uint8_t portBChangeBits = MCP23S17_InterruptCaptureReadRegister(MCP_PORT_B);
+        // Sensor 2
+        sensor(portBFlags, portBChangeBits, ICP0, &sensor2);
+
+        // Sensor 4
+        sensor(portBFlags, portBChangeBits, ICP4, &sensor4);
     }
-}
-
-void toggleLight(Light *light) {
-    if (!light)
-        return;
-
-    if (light->interfaceLocation == Internal) {
-        toggleLight_Internal(&light->internalInterface);
-    } else if (light->interfaceLocation == External) {
-        toggleLight_External(&light->externalInterface);
-    }
-}
-
-void trafficLight_Green(TrafficLight *light) {
-    if (!light)
-        return;
-
-    clearLight(&light->red);
-    clearLight(&light->yellow);
-    setLight(&light->green);
-}
-
-void trafficLight_Yellow(TrafficLight *light) {
-    clearLight(&light->red);
-    setLight(&light->yellow);
-    clearLight(&light->green);
-}
-
-void trafficLight_Red(TrafficLight *light) {
-    setLight(&light->red);
-    clearLight(&light->yellow);
-    clearLight(&light->green);
-}
-
-void trafficLight_Hazard(TrafficLight *light) {
-    if (!light)
-        return;
-
-    toggleLight(&light->yellow);
 }
 
 // INT0 ISR used to handle interrupts from MCP23S17.
 ISR(INT0_vect) {
-    // cli();
-    // Flag_Set(&flag_CheckButtonInterrupts);
-    // uint8_t portAFlags = MCP23S17_InterruptFlagReadRegister(MCP_PORT_A);
-    // uint8_t portBFlags = 0;
-
-    // uint8_t portAChangeBit, portBChangeBit;
-
-    // If nothing found on port A, then read port B.
-    // if (!portAFlags) {
-    //     portBFlags = MCP23S17_InterruptFlagReadRegister(MCP_PORT_B);
-    //     //portBChangeBit =
-    // }
-
-    MCP23S17_InterruptCaptureReadRegister(MCP_PORT_A);
-
-    MCP23S17_InterruptCaptureReadRegister(MCP_PORT_B);
-
-    // LED_Toggle(&debugLed);
-    //  sei();
+    Flag_Set(&flag_CheckButtonInterrupts);
 }
 
 void cycleLight(TrafficLight *light) {
@@ -460,15 +407,15 @@ void cycleLight(TrafficLight *light) {
 
     switch (light->activeLight) {
         case RED:
-            trafficLight_Green(light);
+            TrafficLight_Green(light);
             light->activeLight = GREEN;
             break;
         case YELLOW:
-            trafficLight_Red(light);
+            TrafficLight_Red(light);
             light->activeLight = RED;
             break;
         case GREEN:
-            trafficLight_Yellow(light);
+            TrafficLight_Yellow(light);
             light->activeLight = YELLOW;
             break;
     }
@@ -488,6 +435,7 @@ void pwrSave() {
 // Main Counter
 ISR(TIMER2_COMPA_vect) {
     // Add 1 millisecond to the system counter. Matter of priority so do that straight away.
+    millisecondsElasped++;
     ++timer2InterruptCount;
     Flag_Set(&flag_UpdateTimers);
 }

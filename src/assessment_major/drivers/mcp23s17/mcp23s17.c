@@ -8,6 +8,7 @@
 #define DEVICE_ID 0
 
 Initialiser MCP23S17_Initialise() {
+    initialiseSPIAsMaster();
     // Initialise the port expander so that interrupt pins are mirrored and sequential operations are initially disabled.
     // If we want to use BANK = 1, set accordingly.
 #if defined(BANK_MODE_ONE)

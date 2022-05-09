@@ -77,16 +77,22 @@ inline void TimerTaskReset(TimerTask *t) {
  * @param delta Time in milliseconds since the timers were last updated.
  */
 void TimerTaskUpdate(uint64_t delta) {
+    // GO through all timers
     for (int i = 0; i < timerTaskUsage; i++) {
         TimerTask *t = &timerTasks[i];
+        // If enabled
         if (t->enabled) {
             t->elaspedTime += delta;
 
+            // Time period has elasped
             if (t->elaspedTime >= t->period) {
+                //Call callback function if it exists
                 if (t->eventCallback)
                     t->eventCallback(t->arg);
 
+                // Reset time.
                 t->elaspedTime = 0;
+
                 // If a 1-shot timer, disable after execution.
                 if (t->oneShot)
                     t->enabled = false;

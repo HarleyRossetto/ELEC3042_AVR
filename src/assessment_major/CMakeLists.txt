@@ -20,10 +20,8 @@ set(SOURCES
         "src/${TARGET}/timers.h"
         "src/${TARGET}/button.h"
         "src/${TARGET}/button.c"
-        "src/${TARGET}/clock.h"
-        "src/${TARGET}/clock.c"
-        "src/${TARGET}/systemtimer.h"
-        "src/${TARGET}/systemtimer.c"
+        #"src/${TARGET}/systemtimer.h"
+        #"src/${TARGET}/systemtimer.c"
         "src/${TARGET}/timerTask.h"
         "src/${TARGET}/timerTask.c"
         "src/${TARGET}/led.h"
@@ -37,6 +35,10 @@ set(SOURCES
         "src/${TARGET}/drivers/spi/spi.c"
         "src/${TARGET}/drivers/mcp23s17/mcp23s17.h"
         "src/${TARGET}/drivers/mcp23s17/mcp23s17.c"
+        "src/${TARGET}/intersection/light.h"
+        "src/${TARGET}/intersection/light.c"
+        "src/${TARGET}/intersection/trafficLight.h"
+        "src/${TARGET}/intersection/trafficLight.c"
         )
 
 ####################################################################################################
