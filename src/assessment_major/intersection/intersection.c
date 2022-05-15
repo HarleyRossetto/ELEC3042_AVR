@@ -132,49 +132,52 @@ void applyIntersectionState(IntersectionLightState *state) {
 
 IntersectionLightState mixIntersectionStates(IntersectionLightState *from, IntersectionLightState *to, TrafficLightState mixPhase) {
     IntersectionLightState mixed;
-    
+
+    // Are we mixing to yellow or red?
     TrafficLightState mixValue = (mixPhase == YELLOW) ? YELLOW : RED;
 
-    if (from->broadway_north_state != to->broadway_north_state) {
+    // If the current and next state are different, take the mix value.
+    if (from->broadway_north_state != to->broadway_north_state && from->broadway_north_state != RED) {
         mixed.broadway_north_state = mixValue;
     } else {
-        mixed.broadway_north_state = to->broadway_north_state;
+        //Otherwise they are the same so just assume the current state.
+        mixed.broadway_north_state = from->broadway_north_state;
     }
 
-    if (from->broadway_north_turn_state != to->broadway_north_turn_state) {
+    if (from->broadway_north_turn_state != to->broadway_north_turn_state && from->broadway_north_turn_state != RED) {
         mixed.broadway_north_turn_state = mixValue;
     } else {
-        mixed.broadway_north_turn_state = to->broadway_north_turn_state;
+        mixed.broadway_north_turn_state = from->broadway_north_turn_state;
     }
 
-    if (from->broadway_south_straight_state != to->broadway_south_straight_state) {
+    if (from->broadway_south_straight_state != to->broadway_south_straight_state && from->broadway_south_straight_state != RED) {
         mixed.broadway_south_straight_state = mixValue;
     } else {
-        mixed.broadway_south_straight_state = to->broadway_south_straight_state;
+        mixed.broadway_south_straight_state = from->broadway_south_straight_state;
     }
 
-    if (from->broadway_south_turn_state != to->broadway_south_turn_state) {
+    if (from->broadway_south_turn_state != to->broadway_south_turn_state && from->broadway_south_turn_state != RED) {
         mixed.broadway_south_turn_state = mixValue;
     } else {
-        mixed.broadway_south_turn_state = to->broadway_south_turn_state;
+        mixed.broadway_south_turn_state = from->broadway_south_turn_state;
     }
 
-    if (from->broadway_pedestrian_state != to->broadway_pedestrian_state) {
+    if (from->broadway_pedestrian_state != to->broadway_pedestrian_state && from->broadway_pedestrian_state != RED) {
         mixed.broadway_pedestrian_state = mixValue;
     } else {
-        mixed.broadway_pedestrian_state = to->broadway_pedestrian_state;
+        mixed.broadway_pedestrian_state = from->broadway_pedestrian_state;
     }
 
-    if (from->little_street_pedestrian_state != to->little_street_pedestrian_state) {
+    if (from->little_street_pedestrian_state != to->little_street_pedestrian_state && from->little_street_pedestrian_state != RED) {
         mixed.little_street_pedestrian_state = mixValue;
     } else {
-        mixed.little_street_pedestrian_state = to->little_street_pedestrian_state;
+        mixed.little_street_pedestrian_state = from->little_street_pedestrian_state;
     }
 
-    if (from->little_street_state != to->little_street_state) {
+    if (from->little_street_state != to->little_street_state && from->little_street_state != RED) {
         mixed.little_street_state = mixValue;
     } else {
-        mixed.little_street_state = to->little_street_state;
+        mixed.little_street_state = from->little_street_state;
     }
 
     return mixed;

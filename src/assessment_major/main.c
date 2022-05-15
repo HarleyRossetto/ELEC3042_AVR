@@ -159,13 +159,15 @@ Initialiser initialise() {
     DDRC |= (1 << DDC2) | (1 << DDC3) | (1 << DDC1);
     PORTC |= (1 << PC1);
 
-        // Hazard Interrupt Not really worth it is it?
-        // PCMSK0 |= (1 << PC3); // D3/Pin 18
-        // PCICR |= (1 << PCIE0);
-        // Hazard Pull-up + S3 and S5
-        DDRD &= ~((1 << DDD3) | (1 << DDD4) | (1 << DDD7));
+    // Hazard Interrupt Not really worth it is it?
+    // PCMSK0 |= (1 << PC3); // D3/Pin 18
+    // PCICR |= (1 << PCIE0);
+    // Hazard Pull-up + S3 and S5
+    DDRD &= ~((1 << DDD3) | (1 << DDD4) | (1 << DDD7));
     PORTD |= (1 << PD3) | (1 << PD4) | (1 << PD7);
 
+    // Broadway North Turn
+    DDRB |= (1 << DDB0);
 
     // 328p button interrupts
     PCMSK2 |= (1 << PCINT20) | (1 << PCINT23) | (1 << PCINT19); // S3, S5 & Hazard
@@ -270,20 +272,9 @@ void hazardState() {
     TrafficLight_Hazard(&tl_Little_Street_Pedestrian);
 }
 
-void clearAllLights() {
-    TrafficLight_Blank(&tl_Broadway_North);
-    TrafficLight_Blank(&tl_Broadway_North_Turn);
-    TrafficLight_Blank(&tl_Broadway_South);
-    TrafficLight_Blank(&tl_Broadway_South_Turn);
-    TrafficLight_Blank(&tl_Little_Street);
-    TrafficLight_Blank(&tl_Broadway_Pedestrian);
-    TrafficLight_Blank(&tl_Little_Street_Pedestrian);
-}
-
 void endHazardState() {
     ss = SS_NORMAL;
     TimerTaskDisable(tt_hazardCycle);
-    clearAllLights();
 }
 
 Initialiser initialiseTimerTasks() {

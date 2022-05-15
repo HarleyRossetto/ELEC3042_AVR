@@ -20,6 +20,9 @@ extern Sensor sensor4;
 extern Sensor sensor5;
 extern Sensor sensor6;
 
+FSM_STATE state_before_amber;
+FSM_STATE state_after_red;
+
 /**
  * @brief Heart of the Finite State Machines functioning.
  * FSMUpdate iterates through all transitions listed in the transition table.
@@ -54,8 +57,8 @@ FSMUpdateResult FSMUpdate(FSM_TRANSITION_TABLE *table)
 
                 // if no red or amber store next state in tempory, move to amber, then red, then move to tempory value.
                 if (table->currentState != INTERSECTION_AMBER && table->currentState != INTERSECTION_RED) {
-
-                    state_after_red = transition.nextState();
+                    state_before_amber  = transition.currentState;
+                    state_after_red     = transition.nextState();
                     table->currentState = INTERSECTION_AMBER; // Force to amber
 
                     // Clear sensors?
@@ -92,7 +95,6 @@ FSM_STATE STATE_LITTLE_STREET() { return LITTLE_STREET; }
 FSM_STATE STATE_BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN() { return BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN; }
 FSM_STATE STATE_AMBER() { return INTERSECTION_AMBER; }
 FSM_STATE STATE_RED() { return INTERSECTION_RED; }
-FSM_STATE state_before_amber;
-FSM_STATE state_after_red;
+
 
 FSM_STATE STATE_AFTER_RED() { return state_after_red; }
