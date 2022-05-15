@@ -1,6 +1,25 @@
 #include "trafficLight.h"
 #include "../drivers/mcp23s17/mcp23s17.h"
 
+void TrafficLight_SetState(TrafficLight *light, TrafficLightState state) {
+    if (!light)
+        return;
+
+    switch (state) {
+        case RED:
+            TrafficLight_Red(light);
+            break;
+        case YELLOW:
+            TrafficLight_Yellow(light);
+            break;
+        case GREEN:
+            TrafficLight_Green(light);
+            break;
+        default:
+            TrafficLight_Blank(light);
+    }
+}
+
 static void TrafficLight_InternalClear(InternalLight *light) {
     if (!light)
         return;

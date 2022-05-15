@@ -48,8 +48,13 @@ FSMUpdateResult FSMUpdate(FSM_TRANSITION_TABLE *table)
             {
                 transition.action();
 
+                // If the current state and next state is the same, bail out of here.
+                if (table->currentState == transition.nextState())
+                    return;
+
                 // if no red or amber store next state in tempory, move to amber, then red, then move to tempory value.
                 if (table->currentState != INTERSECTION_AMBER && table->currentState != INTERSECTION_RED) {
+
                     state_after_red = transition.nextState();
                     table->currentState = INTERSECTION_AMBER; // Force to amber
 
@@ -87,6 +92,7 @@ FSM_STATE STATE_LITTLE_STREET() { return LITTLE_STREET; }
 FSM_STATE STATE_BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN() { return BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN; }
 FSM_STATE STATE_AMBER() { return INTERSECTION_AMBER; }
 FSM_STATE STATE_RED() { return INTERSECTION_RED; }
+FSM_STATE state_before_amber;
 FSM_STATE state_after_red;
 
 FSM_STATE STATE_AFTER_RED() { return state_after_red; }

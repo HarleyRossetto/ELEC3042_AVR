@@ -48,22 +48,22 @@ const PhaseTimes phaseTimes[5] = {
     (PhaseTimes){2, 0, 4, 0}, // Broadway South
     (PhaseTimes){7, 3, 7, 3},// Broadway  Turn & Pedestrians
 
-}
-;
+};
 
 extern volatile uint64_t totalMillisecondsElasped;
 
+extern FSM_STATE state_before_amber;
+extern FSM_STATE state_after_red;
+
+IntersectionLightState intersectionStates[MAX_STATES];
+
 TrafficLight tl_Broadway_North;
+TrafficLight tl_Broadway_North_Turn;
 TrafficLight tl_Broadway_South;
 TrafficLight tl_Broadway_South_Turn;
 TrafficLight tl_Broadway_Pedestrian;
 TrafficLight tl_Little_Street_Pedestrian;
 TrafficLight tl_Little_Street;
-
-TimerTask *tt_lightCycle;
-volatile uint8_t lightCycleState;
-
-void cycleLight(TrafficLight *light);
 
 volatile uint16_t periodCounter = 0;
 
@@ -121,8 +121,13 @@ char sensorStateChar(Sensor *b) { return b->triggered ? 'X' : 'O'; }
 
 typedef enum { SS_HAZARD, SS_NORMAL } SystemState;
 
-SystemState ss = SS_HAZARD;
+#define IGNORE_HAZARD_STARTUP
 
+#ifdef IGNORE_HAZARD_STARTUP
+SystemState ss = SS_NORMAL; // SHOULD DEFAULT TO NORMAL
+#else
+SystemState ss = SS_HAZARD;
+#endif
 /*
     Keeps track of how many times the milliseconds timer/counter (TCC2) is triggered.
     In the event the system misses the chance to updated timed/scheduled tasks we can use this value
@@ -166,6 +171,8 @@ Initialiser initialise() {
     PCMSK2 |= (1 << PCINT20) | (1 << PCINT23) | (1 << PCINT19); // S3, S5 & Hazard
     PCMSK1 |= (1 << PCINT9); // S6 Interrupt
     PCICR |= (1 << PCIE1) | (1 << PCIE2);
+
+    initialiseIntersectionStates();
 }
 
 Initialiser initialiseMCP23S17() {
@@ -214,6 +221,11 @@ Initialiser initialiseTrafficLights() {
         (Light){External, (ExternalLight){MCP_PORT_B, GP6}, {NULL}},
         (Light){External, (ExternalLight){MCP_PORT_B, GP7}, {NULL}}
     };
+     tl_Broadway_North_Turn = (TrafficLight){
+        (Light){Internal, {NULL}, (InternalLight){&PORTB, PB0}},
+        (Light){-1, {NULL}, {NULL}},
+        (Light){-1, {NULL}, {NULL}}
+    };
     tl_Broadway_South = (TrafficLight){
         (Light){External, (ExternalLight){MCP_PORT_A, GP1}, {NULL}},
         (Light){External, (ExternalLight){MCP_PORT_A, GP2}, {NULL}},
@@ -248,17 +260,9 @@ Initialiser initialiseInterrupt0() {
     EICRA = (0 << ISC01) | (1 << ISC00);
 }
 
-void cycleAllLights() {
-    cycleLight(&tl_Broadway_North);
-    cycleLight(&tl_Broadway_South);
-    cycleLight(&tl_Broadway_South_Turn);
-    cycleLight(&tl_Little_Street);
-    cycleLight(&tl_Broadway_Pedestrian);
-    cycleLight(&tl_Little_Street_Pedestrian);
-}
-
 void hazardState() {
     TrafficLight_Hazard(&tl_Broadway_North);
+    TrafficLight_Hazard(&tl_Broadway_North_Turn);
     TrafficLight_Hazard(&tl_Broadway_South);
     TrafficLight_Hazard(&tl_Broadway_South_Turn);
     TrafficLight_Hazard(&tl_Little_Street);
@@ -268,6 +272,7 @@ void hazardState() {
 
 void clearAllLights() {
     TrafficLight_Blank(&tl_Broadway_North);
+    TrafficLight_Blank(&tl_Broadway_North_Turn);
     TrafficLight_Blank(&tl_Broadway_South);
     TrafficLight_Blank(&tl_Broadway_South_Turn);
     TrafficLight_Blank(&tl_Little_Street);
@@ -282,10 +287,13 @@ void endHazardState() {
 }
 
 Initialiser initialiseTimerTasks() {
-    // tt_lightCycle = TimerTaskCreate(1000L, &cycleAllLights, NULL, true, false);
-
     tt_period        = TimerTaskCreate(2000L, &ttPeriodElasped, NULL, true, false);
+    
     tt_hazardCycle   = TimerTaskCreate(1000L, &hazardState, NULL, true, false);
+    #ifdef IGNORE_HAZARD_STARTUP
+        TimerTaskDisable(tt_hazardCycle);
+    #endif
+
     tt_updateDisplay = TimerTaskCreate(100L, &Flag_Set, &flag_UpdateDisplay, true, false);
     tt_hazardCancel  = TimerTaskCreate(10000L, &endHazardState, NULL, false, true);
     tt_sampleAdc     = TimerTaskCreate(250L, &ADC_StartConversion, NULL, true, false);
@@ -355,10 +363,27 @@ int main(void) {
     return 0;
 }
 
+
+
 uint8_t fsmSwitches = 0;
 Action actionUpdateIntersection() {
     FSMUpdate(&transitionTable);
     fsmSwitches++;
+
+    if (ss == SS_NORMAL) {
+        IntersectionLightState *currentIntersectionState = &intersectionStates[state_before_amber];
+        IntersectionLightState *nextIntersectionState = &intersectionStates[state_after_red];
+
+        if (transitionTable.currentState == INTERSECTION_AMBER) {
+            IntersectionLightState mixedState = mixIntersectionStates(currentIntersectionState, nextIntersectionState, YELLOW);
+            applyIntersectionState(&mixedState);
+        } else if (transitionTable.currentState == INTERSECTION_RED) {
+            IntersectionLightState mixedState = mixIntersectionStates(currentIntersectionState, nextIntersectionState, RED);
+            applyIntersectionState(&mixedState);
+        } else {
+            applyIntersectionState(&intersectionStates[transitionTable.currentState]);
+        }
+    }
 }
 
 // Break these out into individual functions, then when a value is updated
@@ -402,10 +427,6 @@ Action actionUpdateStatusDisplay() {
             row[i] = phaseStrings[transitionTable.currentState][i];
         }
     }
-
-    row[6] = transitionTable.currentState + 48;
-    row[8] = trigger_bw_to_bw_south() + 48;
-    row[10] = fsmSwitches + 48;
 
     LCD_Position(LCD_Addr, 0x40);             // Bottom left first character position
     //LCD_Write(LCD_Addr, &phaseStrings[phase], 3); // Write System Phase.
@@ -455,26 +476,6 @@ ISR(PCINT1_vect) { Flag_Set(&flag_CheckInternalButtonInterrupts); }
 // PCINT1 used for S3, s5 and hazard interrupts
 ISR(PCINT2_vect) { 
     Flag_Set(&flag_CheckInternalButtonInterrupts); 
-}
-
-void cycleLight(TrafficLight *light) {
-    if (!light)
-        return;
-
-    switch (light->activeLight) {
-        case RED: // If red -> green
-            TrafficLight_Green(light);
-            light->activeLight = GREEN;
-            break;
-        case YELLOW: //Yellow -> red
-            TrafficLight_Red(light);
-            light->activeLight = RED;
-            break;
-        case GREEN: // Green -> Yellow
-            TrafficLight_Yellow(light);
-            light->activeLight = YELLOW;
-            break;
-    }
 }
 
 // Main Counter - 1 ms resolution

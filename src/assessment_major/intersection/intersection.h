@@ -16,11 +16,14 @@ typedef struct  {
     TrafficLightState broadway_pedestrian_state;
 } IntersectionLightState;
 
-#define MAX_STATES 5
+#define MAX_STATES 7
 extern IntersectionLightState intersectionStates[MAX_STATES];
 typedef IntersectionLightState (*IntersectionLightStateArrayPtr)[MAX_STATES];
 
 Initialiser initialiseIntersectionStates();
+
+void applyIntersectionState(IntersectionLightState*);
+IntersectionLightState mixIntersectionStates(IntersectionLightState *, IntersectionLightState *, TrafficLightState mixPhase);
 
 /**
  * Broadway State Triggers

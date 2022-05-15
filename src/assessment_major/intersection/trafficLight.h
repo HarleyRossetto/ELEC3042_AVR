@@ -8,7 +8,6 @@ typedef struct {
     Light red;
     Light yellow;
     Light green;
-    TrafficLightState activeLight;
 } TrafficLight;
 
 void TrafficLight_Clear(Light *light);
@@ -20,6 +19,8 @@ void TrafficLight_Yellow(TrafficLight *light);
 void TrafficLight_Red(TrafficLight *light);
 void TrafficLight_Hazard(TrafficLight *light);
 void TrafficLight_Blank(TrafficLight *light);
+
+void TrafficLight_SetState(TrafficLight *light, TrafficLightState state);
 
 TrafficLight TrafficLight_CreateInternal();
 TrafficLight TrafficLight_CreateExternal();
