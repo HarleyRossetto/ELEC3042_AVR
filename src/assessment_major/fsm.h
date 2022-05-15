@@ -26,7 +26,7 @@ typedef void FSMAction;
 // All the core states in the system
 typedef enum 
 {
-    BROADWAY, BROADWAY_SOUTHBOUND, BROADWAY_TURN_AND_PEDESTRIANS, LITTLE_STREET, BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN, NUMBER_OF_STATES
+    BROADWAY, BROADWAY_SOUTHBOUND, BROADWAY_TURN_AND_PEDESTRIANS, LITTLE_STREET, BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN, INTERSECTION_AMBER, INTERSECTION_RED, NUMBER_OF_STATES
 } FSM_STATE;
 // Maximum number of states, use a dirty trick to make this easy to keep track of.
 // Just need to keep NUMBER_OF_STATES at end of FSM_STATE enumeration.
@@ -38,6 +38,10 @@ FSM_STATE STATE_BROADWAY_SOUTHBOUND();
 FSM_STATE STATE_BROADWAY_TURN_AND_PEDESTRIANS();
 FSM_STATE STATE_LITTLE_STREET();
 FSM_STATE STATE_BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN();
+FSM_STATE STATE_AMBER();
+FSM_STATE STATE_RED();
+extern FSM_STATE state_after_red;
+FSM_STATE STATE_AFTER_RED();
 
 /**
  * @brief FSM Transition structure 
@@ -63,7 +67,7 @@ typedef struct FSM_TRANS
     FSM_STATE (*nextState)();
 } FSM_TRANSITION;
 
-#define FSM_TRANSITION_MAX 30
+#define FSM_TRANSITION_MAX 23
 /**
  * @brief FSMTransition Table: this is where the FSM's state is maintained.
  * 
@@ -88,5 +92,7 @@ typedef enum
 void noAction();
 bool noTrigger();
 FSMUpdateResult FSMUpdate(FSM_TRANSITION_TABLE *table);
+
+extern FSM_TRANSITION_TABLE transitionTable;
 
 #endif //FSM_H

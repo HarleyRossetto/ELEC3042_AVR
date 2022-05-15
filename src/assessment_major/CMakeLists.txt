@@ -41,6 +41,8 @@ set(SOURCES
         "src/${TARGET}/intersection/light.c"
         "src/${TARGET}/intersection/trafficLight.h"
         "src/${TARGET}/intersection/trafficLight.c"
+        "src/${TARGET}/intersection/intersection.h"
+        "src/${TARGET}/intersection/intersection.c"
         "src/${TARGET}/sensor.h"
         "src/${TARGET}/sensor.c"
         )

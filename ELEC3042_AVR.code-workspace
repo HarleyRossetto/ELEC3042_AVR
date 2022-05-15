@@ -23,7 +23,8 @@
 			"types.h": "c",
 			"led.h": "c",
 			"mcp23s17.h": "c",
-			"iotypes.h": "c"
+			"iotypes.h": "c",
+			"trafficlight.h": "c"
 		},
 		"editor.renderWhitespace": "none"
 	},

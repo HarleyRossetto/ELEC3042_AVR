@@ -82,19 +82,22 @@ void TrafficLight_Green(TrafficLight *light) {
 
     TrafficLight_Clear(&light->red);
     TrafficLight_Clear(&light->yellow);
+
     TrafficLight_Set(&light->green);
 }
 
 void TrafficLight_Yellow(TrafficLight *light) {
     TrafficLight_Clear(&light->red);
-    TrafficLight_Set(&light->yellow);
     TrafficLight_Clear(&light->green);
+    
+    TrafficLight_Set(&light->yellow);
 }
 
 void TrafficLight_Red(TrafficLight *light) {
-    TrafficLight_Set(&light->red);
     TrafficLight_Clear(&light->yellow);
     TrafficLight_Clear(&light->green);
+
+    TrafficLight_Set(&light->red);
 }
 
 void TrafficLight_Blank(TrafficLight *light) {
