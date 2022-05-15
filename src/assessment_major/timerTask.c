@@ -68,6 +68,13 @@ inline void TimerTaskReset(TimerTask *t) {
         t->elaspedTime = 0;
 }
 
+void TimerTaskSetPeriod(TimerTask *timer, uint64_t period) {
+    if (!timer)
+        return;
+
+    timer->period = period;
+}
+
 /**
  * @brief Updates all timer tasks which are currently enabled.
  * If their elasped time is greater than or equal to their period then will activate their event

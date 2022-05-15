@@ -76,6 +76,8 @@ void TimerTaskReset(TimerTask *t);
  */
 void TimerTaskUpdate(uint64_t delta);
 
+void TimerTaskSetPeriod(TimerTask *timer, uint64_t period);
+
 /**
  * @brief Provides a pointer the all internal timer tasks.
  * 

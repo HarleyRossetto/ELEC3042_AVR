@@ -11,11 +11,24 @@
 #include "timerTask.h"
 #include "timers.h"
 #include "types.h"
+#include "sensor.h"
+#include "systemtimer.h"
+#include "adc.h"
+
+// ADV value to Period Time MS Lookup table.
+const uint16_t ADC_TO_PERIOD_TIME_MS_LUT[] = {80, 83, 87, 90, 94, 98, 101, 105, 108, 112, 116, 119, 123, 126, 130, 134, 137, 141, 144, 148, 152, 155, 159, 162, 166, 170, 173, 177, 181, 184, 188, 191, 195, 199, 202, 206, 209, 213, 217, 220, 224, 227, 231, 235, 238, 242, 245, 249, 253, 256, 260, 264, 267, 271, 274, 278, 282, 285, 289, 292, 296, 300, 303, 307, 310, 314, 318, 321, 325, 328, 332, 336, 339, 343, 346, 350, 354, 357, 361, 365, 368, 372, 375, 379, 383, 386, 390, 393, 397, 401, 404, 408, 411, 415, 419, 422, 426, 429, 433, 437, 440, 444, 448, 451, 455, 458, 462, 466, 469, 473, 476, 480, 484, 487, 491, 494, 498, 502, 505, 509, 512, 516, 520, 523, 527, 530, 534, 538, 541, 545, 549, 552, 556, 559, 563, 567, 570, 574, 577, 581, 585, 588, 592, 595, 599, 603, 606, 610, 613, 617, 621, 624, 628, 632, 635, 639, 642, 646, 650, 653, 657, 660, 664, 668, 671, 675, 678, 682, 686, 689, 693, 696, 700, 704, 707, 711, 714, 718, 722, 725, 729, 733, 736, 740, 743, 747, 751, 754, 758, 761, 765, 769, 772, 776, 779, 783, 787, 790, 794, 797, 801, 805, 808, 812, 816, 819, 823, 826, 830, 834, 837, 841, 844, 848, 852, 855, 859, 862, 866, 870, 873, 877, 880, 884, 888, 891, 895, 898, 902, 906, 909, 913, 917, 920, 924, 927, 931, 935, 938, 942, 945, 949, 953, 956, 960, 963, 967, 971, 974, 978, 981, 985, 989, 992, 996, 1000};
+/**
+ * 
+ * Average ADC over 10 samples.
+ * 
+ */
+
 
 /// PROTOTYPES
-
 typedef enum { BROADWAY_STRAIGHT, BROADWAY_TURN, LITTLE_STREET, PEDESTRIANS, HAZARD } Phase;
 const char phaseStrings[][3] = {"BRS", "BRT", "LIT", "PED", "HAZ"};
+
+extern volatile uint64_t totalMillisecondsElasped;
 
 Phase phase;
 
@@ -36,6 +49,7 @@ TimerTask *tt_period;
 TimerTask *tt_updateDisplay;
 TimerTask *tt_hazardCycle;
 TimerTask *tt_hazardCancel;
+TimerTask *tt_sampleAdc;
 /// ^^^^^ PROTOTYPES
 
 /**
@@ -50,8 +64,7 @@ Initialiser initialiseTimerTasks();
 Initialiser initialiseInterrupt0();
 
 Action actionUpdateStatusDisplay();
-Action actionUpdateDisplay(); // Debug
-Action actionCheckButtonInterrupts();
+Action actionCheckMcp23s17ButtonInterrupts();
 
 void enableTimers();
 void updateTimers();
@@ -61,9 +74,6 @@ const uint8_t LCD_Addr = 0x27;
 void ttPeriodElasped();
 
 void pwrSave();
-
-uint32_t millisecondsElasped = 0;
-
 /**
  * Flag declarations
  */
@@ -82,6 +92,7 @@ uint8_t timer2InterruptCount = 0;
 
 Initialiser initialise() {
     initialiseTimer2();
+    initialiseADC();
 
     setup_I2C();
     setup_LCD(LCD_Addr);
@@ -131,7 +142,7 @@ Initialiser initialiseMCP23S17() {
 
 Initialiser initialiseFlags() {
     flag_UpdateDisplay         = Flag_Create(&actionUpdateStatusDisplay, NULL);
-    flag_CheckButtonInterrupts = Flag_Create(&actionCheckButtonInterrupts, NULL);
+    flag_CheckButtonInterrupts = Flag_Create(&actionCheckMcp23s17ButtonInterrupts, NULL);
 }
 
 // Millisecond timer
@@ -214,10 +225,12 @@ void endHazardState() {
 
 Initialiser initialiseTimerTasks() {
     // tt_lightCycle = TimerTaskCreate(1000L, &cycleAllLights, NULL, true, false);
+
     tt_period        = TimerTaskCreate(1000L, &ttPeriodElasped, NULL, true, false);
-    tt_hazardCycle   = TimerTaskCreate(500L, &hazardState, NULL, true, false);
+    tt_hazardCycle   = TimerTaskCreate(1000L, &cycleAllLights, NULL, true, false); //&hazardState
     tt_updateDisplay = TimerTaskCreate(100L, &Flag_Set, &flag_UpdateDisplay, true, false);
     tt_hazardCancel  = TimerTaskCreate(10000L, &endHazardState, NULL, false, true);
+    tt_sampleAdc     = TimerTaskCreate(250L, &ADC_StartConversion, NULL, true, false);
 }
 
 void enableTimers() {
@@ -252,6 +265,7 @@ int main(void) {
     sei();
 
     while (1) {
+        // Handles Hazard / Normal Operation States
         // If no hazard signal
         if (PIND & (1 << PIND3)) {
             if (!tt_hazardCancel->enabled && ss == SS_HAZARD) {
@@ -269,12 +283,11 @@ int main(void) {
         // Update timed tasks.
         Flag_RunIfSet(&flag_UpdateTimers);
 
+        // Update Display
         Flag_RunIfSet(&flag_UpdateDisplay);
 
+        // Check MCP23S17 Interrupts
         Flag_RunIfSet(&flag_CheckButtonInterrupts);
-
-        // Enter Power-Save Mode | OVERHEAD is very high to wakeup
-        // pwrSave();
     }
 
     return 0;
@@ -288,14 +301,7 @@ int main(void) {
 // Batch all the data into rows to limit i2c calls potentially?
 const uint8_t delay = 10;
 
-typedef struct {
-    uint32_t lastTime;
-    bool state;
-} Sensor;
-#define PRESSED 1
-#define RELEASED 0
-
-char sensorStateChar(Sensor *b) { return b->state ? 'X' : 'O'; }
+char sensorStateChar(Sensor *b) { return b->triggered ? 'X' : 'O'; }
 
 Sensor sensor0 = {0, RELEASED};
 Sensor sensor1 = {0, RELEASED};
@@ -333,55 +339,16 @@ Action actionUpdateStatusDisplay() {
     LCD_Write(LCD_Addr, &portAFlagsDisplay, 8);
 }
 
-Action actionUpdateDisplay() {
-    uint8_t rega = MCP23S17_InterruptFlagReadRegister(MCP_PORT_A);
-
-    LCD_Position(LCD_Addr, 0);
-    LCD_Write(LCD_Addr, "INTFA:", 6);
-
-    for (int i = 7; i >= 0; i--) {
-        char c = ((rega >> i) & 1) + 48;
-        LCD_Write(LCD_Addr, &c, 1);
-    }
-
-    uint8_t regb = MCP23S17_InterruptFlagReadRegister(MCP_PORT_B);
-
-    LCD_Position(LCD_Addr, 0x40);
-    LCD_Write(LCD_Addr, "INTFB:", 6);
-
-    for (int i = 7; i >= 0; i--) {
-        char c = ((regb >> i) & 1) + 48;
-        LCD_Write(LCD_Addr, &c, 1);
-    }
-}
-
-// Determines if sensor is pressed or not.
-inline void
-sensor(uint8_t flags, uint8_t changeBits, uint8_t pin, Sensor *sensor) {
-    if (millisecondsElasped - sensor->lastTime < delay) {
-        return;
-    }
-
-    sensor->lastTime = millisecondsElasped;
-    if (flags & (1 << pin)) {
-        if (changeBits & (1 << pin)) // Logic level high if left unpressed.
-            sensor->state = RELEASED;
-        else
-            sensor->state = PRESSED;
-    }
-}
-
-Action actionCheckButtonInterrupts() {
-
+Action actionCheckMcp23s17ButtonInterrupts() {
     uint8_t portAFlags = MCP23S17_InterruptFlagReadRegister(MCP_PORT_A);
 
     if (portAFlags) {
         uint8_t portAChangeBits = MCP23S17_InterruptCaptureReadRegister(MCP_PORT_A);
          // Sensor 1
-        sensor(portAFlags, portAChangeBits, ICP4, &sensor1);
+        Sensor_CheckState(portAFlags, portAChangeBits, ICP4, &sensor1);
 
         // Sensor 0
-        sensor(portAFlags, portAChangeBits, ICP0, &sensor0);
+        Sensor_CheckState(portAFlags, portAChangeBits, ICP0, &sensor0);
     }
 
     uint8_t portBFlags = MCP23S17_InterruptFlagReadRegister(MCP_PORT_B);
@@ -389,10 +356,10 @@ Action actionCheckButtonInterrupts() {
     if (portBFlags) {
         uint8_t portBChangeBits = MCP23S17_InterruptCaptureReadRegister(MCP_PORT_B);
         // Sensor 2
-        sensor(portBFlags, portBChangeBits, ICP0, &sensor2);
+        Sensor_CheckState(portBFlags, portBChangeBits, ICP0, &sensor2);
 
         // Sensor 4
-        sensor(portBFlags, portBChangeBits, ICP4, &sensor4);
+        Sensor_CheckState(portBFlags, portBChangeBits, ICP4, &sensor4);
     }
 }
 
@@ -432,10 +399,12 @@ void pwrSave() {
     // SMCR &= ~(1 << SE); // Disable Sleep
 }
 
-// Main Counter
+
+
+// Main Counter - 1 ms resolution
 ISR(TIMER2_COMPA_vect) {
     // Add 1 millisecond to the system counter. Matter of priority so do that straight away.
-    millisecondsElasped++;
+    totalMillisecondsElasped++;
     ++timer2InterruptCount;
     Flag_Set(&flag_UpdateTimers);
 }

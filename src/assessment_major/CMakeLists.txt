@@ -16,12 +16,14 @@ set(SOURCES
         "src/${TARGET}/null.h"
         "src/${TARGET}/fsm.h" 
         "src/${TARGET}/fsm.c"
+        "src/${TARGET}/adc.h" 
+        "src/${TARGET}/adc.c"
         "src/${TARGET}/bool.h"
         "src/${TARGET}/timers.h"
         "src/${TARGET}/button.h"
         "src/${TARGET}/button.c"
-        #"src/${TARGET}/systemtimer.h"
-        #"src/${TARGET}/systemtimer.c"
+        "src/${TARGET}/systemtimer.h"
+        "src/${TARGET}/systemtimer.c"
         "src/${TARGET}/timerTask.h"
         "src/${TARGET}/timerTask.c"
         "src/${TARGET}/led.h"
@@ -39,6 +41,8 @@ set(SOURCES
         "src/${TARGET}/intersection/light.c"
         "src/${TARGET}/intersection/trafficLight.h"
         "src/${TARGET}/intersection/trafficLight.c"
+        "src/${TARGET}/sensor.h"
+        "src/${TARGET}/sensor.c"
         )
 
 ####################################################################################################

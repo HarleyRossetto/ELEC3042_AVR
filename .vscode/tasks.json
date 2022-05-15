@@ -15,9 +15,7 @@
                 "showReuseMessage": true,
                 "clear": false
             },
-            "problemMatcher": [
-                
-            ]
+            "problemMatcher": []
         },
         {
             "label": "Detach USB from WSL",
@@ -31,9 +29,7 @@
                 "showReuseMessage": true,
                 "clear": false
             },
-            "problemMatcher": [
-                
-            ]
+            "problemMatcher": []
         },
         {
             "label": "Dissassemble",
@@ -61,7 +57,11 @@
                 "showReuseMessage": true,
                 "clear": true
             },
-            "problemMatcher": []
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ],
     "inputs": [

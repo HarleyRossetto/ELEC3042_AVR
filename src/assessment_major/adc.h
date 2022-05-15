@@ -9,6 +9,9 @@
  * 
  */
 
+#include "types.h"
+#include "stdint.h"
+
 #ifndef ADC_H
 #define ADC_H
 
@@ -33,7 +36,9 @@
 #define ADC_AUTO_TRIGGER_SOURCE_TCC0_COMPARE_MATCH_A ((0 << ADTS2) | (1 << ADTS1) | (1 << ADTS0))
 #define ADC_AUTO_TRIGGER_FREE_RUNNING ((0 << ADTS2) | (0 << ADTS1) | (0 << ADTS0))
 
-// Aalias OCR0A (where ADCH is placed upon comparison)
-#define ADC_VALUE OCR0A 
+Initialiser initialiseADC();
+void ADC_StartConversion();
+
+uint16_t ADC_GetSampleAverage();
 
 #endif // ADC_H
