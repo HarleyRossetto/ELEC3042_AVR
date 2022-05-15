@@ -98,6 +98,9 @@ const uint8_t LCD_Addr = 0x27;
 void ttPeriodElasped();
 
 void pwrSave();
+
+void clearAllLights();
+
 /**
  * Flag declarations
  */
@@ -128,6 +131,7 @@ SystemState ss = SS_NORMAL; // SHOULD DEFAULT TO NORMAL
 #else
 SystemState ss = SS_HAZARD;
 #endif
+
 /*
     Keeps track of how many times the milliseconds timer/counter (TCC2) is triggered.
     In the event the system misses the chance to updated timed/scheduled tasks we can use this value
@@ -159,9 +163,6 @@ Initialiser initialise() {
     DDRC |= (1 << DDC2) | (1 << DDC3) | (1 << DDC1);
     PORTC |= (1 << PC1);
 
-    // Hazard Interrupt Not really worth it is it?
-    // PCMSK0 |= (1 << PC3); // D3/Pin 18
-    // PCICR |= (1 << PCIE0);
     // Hazard Pull-up + S3 and S5
     DDRD &= ~((1 << DDD3) | (1 << DDD4) | (1 << DDD7));
     PORTD |= (1 << PD3) | (1 << PD4) | (1 << PD7);
@@ -184,14 +185,12 @@ Initialiser initialiseMCP23S17() {
 
     // Initialise Port A
     MCP23S17_IoDirectionSetRegister(MCP_PORT_A, 0b00010001);
-    // MCP23S17_GpioSetRegister(MCP_PORT_A, 0b11101110);                // Turn all on
     MCP23S17_PullUpSetRegister(MCP_PORT_A, (1 << PU0) | (1 << PU4)); // Enable Pull-Up Resistors on buttons
     MCP23S17_InterruptEnable(MCP_PORT_A, GPINT0);
     MCP23S17_InterruptEnable(MCP_PORT_A, GPINT4);
 
     // Initialise Port B
     MCP23S17_IoDirectionSetRegister(MCP_PORT_B, 0b00010001);
-    // MCP23S17_GpioSetRegister(MCP_PORT_B, 0b11101110);                // Turn all on
     MCP23S17_PullUpSetRegister(MCP_PORT_B, (1 << PU0) | (1 << PU4)); // Enable Pull-Up Resistors on buttons
     MCP23S17_InterruptEnable(MCP_PORT_B, GPINT0);
     MCP23S17_InterruptEnable(MCP_PORT_B, GPINT4);
@@ -334,6 +333,7 @@ int main(void) {
         } else { // Hazard signal active
             if (ss == SS_NORMAL) {
                 ss = SS_HAZARD;
+                clearAllLights();
                 TimerTaskEnable(tt_hazardCycle);
                 TimerTaskDisable(tt_hazardCancel);
             }
@@ -454,6 +454,15 @@ Action actionCheck328Buttons() {
     Sensor_CheckState_Internal(&PIND, PD7, &sensor3);
     Sensor_CheckState_Internal(&PIND, PD4, &sensor5);
     Sensor_CheckState_Internal(&PINC, PC1, &sensor6);
+}
+
+void clearAllLights() {
+    TrafficLight_Blank(&tl_Broadway_North);
+    TrafficLight_Blank(&tl_Broadway_South);
+    TrafficLight_Blank(&tl_Broadway_South_Turn);
+    TrafficLight_Blank(&tl_Little_Street);
+    TrafficLight_Blank(&tl_Broadway_Pedestrian);
+    TrafficLight_Blank(&tl_Little_Street_Pedestrian);
 }
 
 // INT0 ISR used to handle interrupts from MCP23S17.

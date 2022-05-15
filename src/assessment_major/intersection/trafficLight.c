@@ -129,5 +129,18 @@ void TrafficLight_Hazard(TrafficLight *light) {
     if (!light)
         return;
 
+    //Dont clear red if it matches yellow - these are pedestrian lights and red and yellow are the same light.
+    // Going to assume if red in external, than orange is too, and vice versa for internal.
+    if (light->red.interfaceLocation == External) {
+        if (light->red.externalInterface.pin != light->yellow.externalInterface.pin) {
+            TrafficLight_Clear(&light->red);
+        }
+    } else if (light->red.interfaceLocation == Internal) {
+    if (light->red.internalInterface.pin != light->yellow.internalInterface.pin) {
+            TrafficLight_Clear(&light->red);
+        }
+    }
+
+    TrafficLight_Clear(&light->green);
     TrafficLight_Toggle(&light->yellow);
 }
