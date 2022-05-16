@@ -39,6 +39,6 @@
 Initialiser initialiseADC();
 void ADC_StartConversion();
 
-uint16_t ADC_GetSampleAverage();
+extern uint8_t adc_value;
 
 #endif // ADC_H
