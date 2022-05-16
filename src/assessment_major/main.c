@@ -274,6 +274,7 @@ void hazardState() {
 void endHazardState() {
     ss = SS_NORMAL;
     TimerTaskDisable(tt_hazardCycle);
+    transitionTable.currentState = BROADWAY;
 }
 
 Initialiser initialiseTimerTasks() {
