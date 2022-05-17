@@ -256,41 +256,44 @@ Initialiser initialiseTimer1() {
     PORTB &= ~(1 << PORTB1);
 }
 
+ExternalLight NULL_EXTERNAL_LIGHT = {0, 0};
+InternalLight NULL_INTERNAL_LIGHT = {0, 0};
+
 Initialiser initialiseTrafficLights() {
     tl_Broadway_North = (TrafficLight){
-        (Light){External, (ExternalLight){MCP_PORT_B, GP5}, {NULL}},
-        (Light){External, (ExternalLight){MCP_PORT_B, GP6}, {NULL}},
-        (Light){External, (ExternalLight){MCP_PORT_B, GP7}, {NULL}}
+        (Light){External, (ExternalLight){MCP_PORT_B, GP5}, NULL_INTERNAL_LIGHT},
+        (Light){External, (ExternalLight){MCP_PORT_B, GP6}, NULL_INTERNAL_LIGHT},
+        (Light){External, (ExternalLight){MCP_PORT_B, GP7}, NULL_INTERNAL_LIGHT}
     };
      tl_Broadway_North_Turn = (TrafficLight){
-        (Light){Internal, {NULL}, (InternalLight){&PORTB, PB0}},
-        (Light){-1, {NULL}, {NULL}},
-        (Light){-1, {NULL}, {NULL}}
+        (Light){Internal, NULL_EXTERNAL_LIGHT, (InternalLight){&PORTB, PB0}},
+        (Light){-1, NULL_EXTERNAL_LIGHT, NULL_INTERNAL_LIGHT},
+        (Light){-1, NULL_EXTERNAL_LIGHT, NULL_INTERNAL_LIGHT}
     };
     tl_Broadway_South = (TrafficLight){
-        (Light){External, (ExternalLight){MCP_PORT_A, GP1}, {NULL}},
-        (Light){External, (ExternalLight){MCP_PORT_A, GP2}, {NULL}},
-        (Light){External, (ExternalLight){MCP_PORT_A, GP3}, {NULL}}
+        (Light){External, (ExternalLight){MCP_PORT_A, GP1}, NULL_INTERNAL_LIGHT},
+        (Light){External, (ExternalLight){MCP_PORT_A, GP2}, NULL_INTERNAL_LIGHT},
+        (Light){External, (ExternalLight){MCP_PORT_A, GP3}, NULL_INTERNAL_LIGHT}
     };
     tl_Broadway_South_Turn = (TrafficLight){
-        (Light){External, (ExternalLight){MCP_PORT_A, GP5}, {NULL}},
-        (Light){External, (ExternalLight){MCP_PORT_A, GP6}, {NULL}},
-        (Light){External, (ExternalLight){MCP_PORT_A, GP7}, {NULL}}
+        (Light){External, (ExternalLight){MCP_PORT_A, GP5}, NULL_INTERNAL_LIGHT},
+        (Light){External, (ExternalLight){MCP_PORT_A, GP6}, NULL_INTERNAL_LIGHT},
+        (Light){External, (ExternalLight){MCP_PORT_A, GP7}, NULL_INTERNAL_LIGHT}
     };
     tl_Little_Street = (TrafficLight){
-        (Light){External, (ExternalLight){MCP_PORT_B, GP1}, {NULL}},
-        (Light){External, (ExternalLight){MCP_PORT_B, GP2}, {NULL}},
-        (Light){External, (ExternalLight){MCP_PORT_B, GP3}, {NULL}}
+        (Light){External, (ExternalLight){MCP_PORT_B, GP1}, NULL_INTERNAL_LIGHT},
+        (Light){External, (ExternalLight){MCP_PORT_B, GP2}, NULL_INTERNAL_LIGHT},
+        (Light){External, (ExternalLight){MCP_PORT_B, GP3}, NULL_INTERNAL_LIGHT}
     };
     tl_Broadway_Pedestrian = (TrafficLight){
-        (Light){Internal, {NULL}, (InternalLight){&PORTD, PD5}},
-        (Light){Internal, {NULL}, (InternalLight){&PORTD, PD5}}, // Duplicate red light to yellow so it becomes our hazard light too.
-        (Light){Internal, {NULL}, (InternalLight){&PORTD, PD6}},
+        (Light){Internal, NULL_EXTERNAL_LIGHT, (InternalLight){&PORTD, PD5}},
+        (Light){Internal, NULL_EXTERNAL_LIGHT, (InternalLight){&PORTD, PD5}}, // Duplicate red light to yellow so it becomes our hazard light too.
+        (Light){Internal, NULL_EXTERNAL_LIGHT, (InternalLight){&PORTD, PD6}},
     };
     tl_Little_Street_Pedestrian = (TrafficLight){
-        (Light){Internal, {NULL}, (InternalLight){&PORTC, PC2}},
-        (Light){Internal, {NULL}, (InternalLight){&PORTC, PC2}},
-        (Light){Internal, {NULL}, (InternalLight){&PORTC, PC3}}
+        (Light){Internal, NULL_EXTERNAL_LIGHT, (InternalLight){&PORTC, PC2}},
+        (Light){Internal, NULL_EXTERNAL_LIGHT, (InternalLight){&PORTC, PC2}},
+        (Light){Internal, NULL_EXTERNAL_LIGHT, (InternalLight){&PORTC, PC3}}
     };
 }
 
@@ -319,7 +322,6 @@ void endHazardState() {
 }
 
 TimerTask *tt_sound_idle_stop;
-TimerTask *tt_sound_idle_start;
 
 void pedestrian_idle_start() {
     enableTimer(TC1, TIMER1_CLOCK_SELECT_8_PRESCALER);
@@ -328,14 +330,9 @@ void pedestrian_idle_start() {
     TimerTaskRestart(tt_sound_idle_stop);
 }
 
-bool stopCalled = false;
 void pedestrian_idle_stop() {
     disableTimer(TC1);
     TCNT1 = 0;
-
-    stopCalled = !stopCalled;
-
-    //TimerTaskRestart(tt_sound_idle_start);
 }
 
 // void pedestrian_idle() {
@@ -358,9 +355,38 @@ void pedestrian_idle_stop() {
 //     // TimerTaskEnable(tt_sound_idle);
 // }
 
-// int tones[] = {
-//   3465, 2850, 2333, 1956, 1638, 1380, 1161, 992, 814, 704, 500
-// }; 
+int tones[] = {
+  3465, 2850, 2333, 1956, 1638, 1380, 1161, 992, 814, 704, 500
+};
+
+TimerTask *tt_sound_descending;
+TimerTask *tt_chatter;
+
+void descendingTone() {
+    static uint8_t i = 11;
+    enableTimer(TC1, TIMER1_CLOCK_SELECT_8_PRESCALER);
+    OCR1A    = tones[i--];
+    // Just in case of some crazy freak rollover...
+    if (i == 0 || i >= 12) {
+        i = 11;
+        TimerTaskDisable(tt_sound_descending);
+        TCNT1 = 0;
+        disableTimer(TC1);
+        TimerTaskRestart(tt_chatter);
+    }
+}
+
+void chatterTone() {
+    static uint8_t i = 0;
+    enableTimer(TC1, TIMER1_CLOCK_SELECT_8_PRESCALER);
+    OCR1A    = tones[i++];
+    if (i >= 11) {
+        i = 0;
+        TimerTaskDisable(tt_chatter);
+        TCNT1 = 0;
+        disableTimer(TC1);
+    }
+}
 
 // void playChirpTask() {
 //     static uint8_t i = 0;
@@ -389,6 +415,8 @@ void pedestrian_idle_stop() {
 //     OCR1A = FREQ_TO_OCR(973);
 // }
 
+Action setUpdateDisplayFlag_ToAvoidCastErrors() { Flag_Set(&flag_UpdateDisplay); }
+
 Initialiser initialiseTimerTasks() {
     tt_period        = TimerTaskCreate(PERIOD_MS, &ttPeriodElasped, NULL, true, false);
     
@@ -397,13 +425,16 @@ Initialiser initialiseTimerTasks() {
         TimerTaskDisable(tt_hazardCycle);
     #endif
 
-    tt_updateDisplay = TimerTaskCreate(100L, &Flag_Set, &flag_UpdateDisplay, true, false);
-    tt_hazardCancel  = TimerTaskCreate(10000L, &endHazardState, NULL, false, true);
+    tt_updateDisplay       = TimerTaskCreate(100L, &setUpdateDisplayFlag_ToAvoidCastErrors, NULL, true, false);
+    tt_hazardCancel        = TimerTaskCreate(10000L, &endHazardState, NULL, false, true);
 
     tt_pedestrianFlash = TimerTaskCreate(PERIOD_MS / 2, &flashPedestrianLight, NULL, false, false);
 
-    //tt_sound_idle_start = TimerTaskCreate(1800L, pedestrian_idle_start, NULL, true, true);
     tt_sound_idle_stop = TimerTaskCreate(100L, pedestrian_idle_stop, NULL, false, true);
+
+    tt_sound_descending = TimerTaskCreate(50L, descendingTone, NULL, false, false);
+
+    tt_chatter = TimerTaskCreate(20L, chatterTone, NULL, false, false);
 }
 
 void enableTimers() {
@@ -501,10 +532,19 @@ void ttPeriodElasped() {
         const bool isPedestrianState = (transitionTable.currentState == BROADWAY_TURN_AND_PEDESTRIANS || transitionTable.currentState == BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN);
         if (isPedestrianState) {
             pedestrian_idle_stop();
+            if (!tt_sound_descending->enabled) {
+                if (timerEnabled(TC1)) {
+                    disableTimer(TC1);
+                }
+                TimerTaskRestart(tt_sound_descending);
+            }
         } else {
             chirpPeriodCount++;
 
             if (chirpPeriodCount % 5 == 0) {
+                if (timerEnabled(TC1)) {
+                    disableTimer(TC1);
+                }
                 pedestrian_idle_start();
             }
 
