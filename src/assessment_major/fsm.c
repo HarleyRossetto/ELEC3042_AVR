@@ -49,13 +49,14 @@ FSMUpdateResult FSMUpdate(FSM_TRANSITION_TABLE *table)
         {
             if (transition.trigger())
             {
-                transition.action();
 
                 const FSM_STATE initial = table->currentState;
 
                 // If the current state and next state is the same, bail out of here.
                 if (table->currentState == transition.nextState())
                     return;
+
+                transition.action();
 
                 // if no red or amber store next state in tempory, move to amber, then red, then move to tempory value.
                 if (table->currentState != INTERSECTION_AMBER && table->currentState != INTERSECTION_RED) {

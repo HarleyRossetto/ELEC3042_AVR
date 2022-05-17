@@ -137,6 +137,7 @@ uint8_t timer2InterruptCount = 0;
 
 Initialiser initialise() {
     initialiseTimer2();
+    initialiseTimer1();
     initialiseADC();
 
     setup_I2C();
@@ -163,7 +164,7 @@ Initialiser initialise() {
     PORTD |= (1 << PD3) | (1 << PD4) | (1 << PD7);
 
     // Broadway North Turn
-    DDRB |= (1 << DDB0);
+    DDRB |= (1 << DDB0) | (1 << DDB1);
 
     // 328p button interrupts
     PCMSK2 |= (1 << PCINT20) | (1 << PCINT23) | (1 << PCINT19); // S3, S5 & Hazard
@@ -218,14 +219,11 @@ Initialiser initialiseTimer2() {
 Initialiser initialiseTimer1() {
     disableTimer(TC1);
     // Timer/Counter Control Register A (Compare Output Modes and Waveform
-    // Generation Modes (bits 11 and 10))
-    TCCR1A = TC1_TCCR1A_CFG; // Waveform Generation Mode - PWM, Phase Correct Mode 11
-
-    // Timer starts once Clock Select is set, so we will configure that last.
+    TCCR1A = TC1_WGM_MODE_15_TCCR1A; // Waveform Generation Mode - Fast PWM, Mode 7
     //  Timer/Counter Control Register B (Input Capture Noise Canceler, Input
     //  Capture Edge Select, Waveform Generation Mode (bits 13 and 12), and Clock
     //  Select)
-    TCCR1B = (1 << WGM13) | (0 << WGM12);
+    TCCR1B = TC1_WGM_MODE_15_TCCR1B;
 
     // Timer/Counter Control Register C (Force Output Compare)
     TCCR1C = 0x00;
@@ -233,13 +231,13 @@ Initialiser initialiseTimer1() {
     // Timer/Counter Value
     TCNT1 = 0;
 
+    // Input Capture Register
+    ICR1 = 250000 / 277 - 1; //250000 = f_cpu / prescaler -> 16_000_000 / 64
+
     // Output Compare Register A
-    OCR1A = 124;
+    OCR1A = ICR1 / 2; // Duty Cycle?
     // Output Compare Register B
     OCR1B = 0;
-
-    // Input Capture Register
-    ICR1 = 0x0;
 
     // Timer/Counter Interrupt Mask Register (Input Capture Interrupt Enable,
     // Output Compare A/B Match Interrupt Enable, and Overflow Interrupt Enable)
@@ -332,6 +330,7 @@ Initialiser initialiseTimerTasks() {
 void enableTimers() {
     // Primary millisecond counter
     enableTimer(TC2, TIMER2_CLOCK_SELECT_64_PRESCALER);
+    enableTimer(TC1, TIMER1_CLOCK_SELECT_64_PRESCALER);
 }
 
 void updateTimers() {

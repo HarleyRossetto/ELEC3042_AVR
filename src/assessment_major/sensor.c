@@ -57,6 +57,9 @@ void Sensor_ClearTriggeredFlag(Sensor *sensor) {
 
     intersection_change_trigger_sensor = *sensor; // To access timing information.
 
-    sensor->triggered = RELEASED;
-    sensor->periods_held = 0; // Clear periods held.
+    // If the sensor is still pressed, dont clear trigger. Could be a lot of traffic?
+    if (sensor->state != PRESSED) {
+        sensor->triggered = RELEASED;
+        sensor->periods_held = 0; // Clear periods held.
+    }
 }
