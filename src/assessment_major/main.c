@@ -433,7 +433,7 @@ Initialiser initialiseTimerTasks() {
     tt_chatter = TimerTaskCreate(20L, chatterTone, NULL, false, false);
 
     // Save state to eeprom every 15 seconds.
-    tt_saveStateToEeprom = TimerTaskCreate(1000L * 5, &saveStateToEeprom, NULL, true, false);
+    tt_saveStateToEeprom = TimerTaskCreate(1000L * 15, &saveStateToEeprom, NULL, true, false);
 }
 
 void enableTimers() {
