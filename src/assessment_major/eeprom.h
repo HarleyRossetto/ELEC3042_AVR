@@ -24,6 +24,7 @@ typedef struct  {
     FSM_STATE intersectionState;
     FSM_STATE beforeAmberState;
     FSM_STATE afterRedState;
+    uint8_t timeInCurrentState;
     uint16_t internal_checksum;
 } IntersectionDataStruct;
 

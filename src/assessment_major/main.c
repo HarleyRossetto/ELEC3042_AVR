@@ -19,6 +19,8 @@
 #include "period.h"
 #include "eeprom.h"
 
+bool startup = true;
+
 /*
     Broadway                ->  BWY
     Broadway South          ->  BWS
@@ -184,11 +186,14 @@ Initialiser initialise() {
 
     ADC_StartConversion();
 
-    id = EEPROM_ReadIntersectionData();
-    if (id.isValid) {
-        transitionTable.currentState = id.intersectionData.intersectionState;
-        state_after_red              = id.intersectionData.afterRedState;
-        state_before_amber              = id.intersectionData.beforeAmberState;
+    if (!(PIND & (1 << PIND3))) {
+        id = EEPROM_ReadIntersectionData();
+        if (id.isValid) {
+            transitionTable.currentState = id.intersectionData.intersectionState;
+            state_after_red              = id.intersectionData.afterRedState;
+            state_before_amber              = id.intersectionData.beforeAmberState;
+            // period_elasped_in_current_state = id.intersectionData.timeInCurrentState; // This is unnecessary and leads to errors/danger.
+        }
     }
 }
 
@@ -404,7 +409,7 @@ void chatterTone() {
 Action setUpdateDisplayFlag_ToAvoidCastErrors() { Flag_Set(&flag_UpdateDisplay); }
 
 Action saveStateToEeprom() {
-    IntersectionDataStruct ids = {transitionTable.currentState, state_before_amber, state_after_red};
+    IntersectionDataStruct ids = {transitionTable.currentState, state_before_amber, state_after_red, period_elasped_in_current_state};
     EEPROM_SetIntersectionDataStruct(ids);
 }
 
@@ -489,7 +494,6 @@ void flashPedestrianLight() {
 
 uint8_t state_change_time;
 uint8_t chirpPeriodCount = 0;
-char stateType           = 'R';
 void ttPeriodElasped() {
     periodCounter++; 
     if (periodCounter > 99999)
@@ -498,7 +502,6 @@ void ttPeriodElasped() {
     // Handle held buttons
     handleHeldInputs();
 
-    stateType = (transitionTable.currentState == BROADWAY_TURN_AND_PEDESTRIANS || transitionTable.currentState == BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN) ? 'P' : 'C';
     // Advance intersection state logic
     if (ss == SS_NORMAL) {
         state_change_time = getStatePeriodChangeTime();
@@ -515,13 +518,7 @@ void ttPeriodElasped() {
             }
         }
 
-        if (period_elasped_in_current_state >= state_change_time) {
-            Flag_Set(&flag_UpdateIntersection);
-            if (tt_pedestrianFlash->enabled) {
-                TimerTaskDisable(tt_pedestrianFlash);
-            }
-        }
-
+        // Pedestrian sounds
         const bool isPedestrianState = (transitionTable.currentState == BROADWAY_TURN_AND_PEDESTRIANS || transitionTable.currentState == BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN);
         if (isPedestrianState) {
             pedestrian_idle_stop();
@@ -543,6 +540,14 @@ void ttPeriodElasped() {
 
             if (chirpPeriodCount == 255) {// Roll over now to avoid 2 quick chirps
                 chirpPeriodCount = 0;
+            }
+        }
+
+        // Update intersection
+        if (period_elasped_in_current_state >= state_change_time) {
+            Flag_Set(&flag_UpdateIntersection);
+            if (tt_pedestrianFlash->enabled) {
+                TimerTaskDisable(tt_pedestrianFlash);
             }
         }
     }
@@ -604,8 +609,11 @@ int main(void) {
 }
 
 Action actionUpdateIntersection() {
-    // Update the intersection FSM.
-    const FSMUpdateResult HAS_STATE_CHANGED = FSMUpdate(&transitionTable);
+    FSMUpdateResult HAS_STATE_CHANGED = NO_STATE_CHANGE;
+
+    // Only update the state maching when not in startup, otherwise we will advance to next state immediately.
+    if (!startup)
+        HAS_STATE_CHANGED = FSMUpdate(&transitionTable); // Update the intersection FSM.
 
     // If the state did chance, reset periods elasped in current state.
     if (HAS_STATE_CHANGED == STATE_CHANGE)
@@ -631,6 +639,8 @@ Action actionUpdateIntersection() {
             applyIntersectionState(&intersectionStates[transitionTable.currentState]);
         }
     }
+
+    startup = false;
 }
 
 // Break these out into individual functions, then when a value is updated
@@ -703,9 +713,9 @@ Action actionUpdateStatusDisplay() {
     //     period_ms /= 10;
     // }
 
-    row[6] = id.intersectionData.intersectionState + 48;
-    row[8] = id.intersectionData.beforeAmberState + 48;
-    row[10] = id.intersectionData.afterRedState + 48;
+    // row[6] = id.intersectionData.intersectionState + 48;
+    // row[8] = id.intersectionData.beforeAmberState + 48;
+    // row[10] = id.intersectionData.afterRedState + 48;
 
     row[14] = saveCount + 48;
 
