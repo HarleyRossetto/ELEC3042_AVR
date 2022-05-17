@@ -32,7 +32,6 @@ typedef struct {
     uint8_t minTimeShoulder : 4;
     uint8_t maxTime : 4;
     uint8_t maxTimeShoulder : 4;
-    uint8_t requestedHoldTime : 4;
 } PhaseTimes;
 
 const PhaseTimes phaseTimes[] = {
@@ -67,6 +66,7 @@ TimerTask *tt_period;
 TimerTask *tt_updateDisplay;
 TimerTask *tt_hazardCycle;
 TimerTask *tt_hazardCancel;
+TimerTask *tt_pedestrianFlash;
 
 /**
  * Initialiser Prototypes
@@ -86,6 +86,8 @@ Action actionUpdateIntersection();
 
 void enableTimers();
 void updateTimers();
+
+void flashPedestrianLight();
 
 const uint8_t LCD_Addr = 0x27;
 
@@ -314,7 +316,7 @@ void endHazardState() {
 }
 
 Initialiser initialiseTimerTasks() {
-    tt_period        = TimerTaskCreate(2000L, &ttPeriodElasped, NULL, true, false);
+    tt_period        = TimerTaskCreate(PERIOD_MS, &ttPeriodElasped, NULL, true, false);
     
     tt_hazardCycle   = TimerTaskCreate(1000L, &hazardState, NULL, true, false);
     #ifdef IGNORE_HAZARD_STARTUP
@@ -323,6 +325,8 @@ Initialiser initialiseTimerTasks() {
 
     tt_updateDisplay = TimerTaskCreate(100L, &Flag_Set, &flag_UpdateDisplay, true, false);
     tt_hazardCancel  = TimerTaskCreate(10000L, &endHazardState, NULL, false, true);
+
+    tt_pedestrianFlash = TimerTaskCreate(PERIOD_MS / 2, &flashPedestrianLight, NULL, false, false);
 }
 
 void enableTimers() {
@@ -360,16 +364,30 @@ Sensor intersection_change_trigger_sensor;
 uint8_t getStatePeriodChangeTime() {
     const PhaseTimes STATE_PERIODS = phaseTimes[transitionTable.currentState];
 
-    if (intersection_change_trigger_sensor.periods_held >= STATE_PERIODS.maxTime)
-        return STATE_PERIODS.maxTime;                           // Return maximum time
-    else if (intersection_change_trigger_sensor.periods_held < STATE_PERIODS.minTime)
-        return STATE_PERIODS.minTime;                           // Return minimum time
+    if (intersection_change_trigger_sensor.periods_held >= STATE_PERIODS.maxTime + STATE_PERIODS.maxTimeShoulder)
+        return STATE_PERIODS.maxTime + STATE_PERIODS.maxTimeShoulder;                           // Return calculated maximum time
+    else if (intersection_change_trigger_sensor.periods_held < STATE_PERIODS.minTime + STATE_PERIODS.minTimeShoulder)
+        return STATE_PERIODS.minTime + STATE_PERIODS.minTimeShoulder;                           // Return calculated minimum time
     else 
         return intersection_change_trigger_sensor.periods_held; // Return held time
 }
 
-uint8_t state_change_time;
 
+
+void flashPedestrianLight() {
+    switch (transitionTable.currentState) {
+        case BROADWAY_TURN_AND_PEDESTRIANS:
+            TrafficLight_Toggle(&tl_Broadway_Pedestrian.green);
+            break;
+        case BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN:
+            TrafficLight_Toggle(&tl_Little_Street_Pedestrian.green);
+            break;
+        default:
+            return;
+    }
+}
+
+uint8_t state_change_time;
 void ttPeriodElasped() { 
     periodCounter++; 
     if (periodCounter > 99999)
@@ -382,17 +400,23 @@ void ttPeriodElasped() {
     if (ss == SS_NORMAL) {
         state_change_time = getStatePeriodChangeTime();
 
-        // Broadway straight needs to not refresh/tick over, must keep counting periods until it is interrupted.
-        // if (transitionTable.currentState == BROADWAY) {
-        //     if (period_elasped_in_current_state >= state_change_time) {
-        //         Flag_Set(&flag_UpdateIntersection);
-        //         period_elasped_in_current_state = 0;
-        //     }    
-        // }
+        const PhaseTimes STATE_PERIODS = phaseTimes[transitionTable.currentState];
+        // Handle pedestrian flashing. 
+        // If current periods equals max (or min) time and the shoulder time is not 0, activate flash task.
+        if ((period_elasped_in_current_state >= STATE_PERIODS.maxTime && STATE_PERIODS.maxTimeShoulder != 0) ||
+            (period_elasped_in_current_state >= STATE_PERIODS.minTime && STATE_PERIODS.minTime != 0)) {
+                // If not enabled, reset and enable
+            if (!tt_pedestrianFlash->enabled) {
+                TimerTaskReset(tt_pedestrianFlash);
+                TimerTaskEnable(tt_pedestrianFlash);
+            }
+        }
 
         if (period_elasped_in_current_state >= state_change_time) {
             Flag_Set(&flag_UpdateIntersection);
-            //
+            if (tt_pedestrianFlash->enabled) {
+                TimerTaskDisable(tt_pedestrianFlash);
+            }
         }
     }
 
@@ -442,6 +466,7 @@ int main(void) {
         Flag_RunIfSet(&flag_CheckInternalButtonInterrupts);
 
         TimerTaskSetPeriod(tt_period, PERIOD_MS);
+        TimerTaskSetPeriod(tt_pedestrianFlash, PERIOD_MS / 2);
     }
 
     return 0;
@@ -502,8 +527,8 @@ Action actionUpdateStatusDisplay() {
     }
 
     // Intersection change trigger sensor
-    row[8] = 'P';
-    row[9] = 48 + intersection_change_trigger_sensor.periods_held;
+    // row[8] = 'P';
+    // row[9] = 48 + intersection_change_trigger_sensor.periods_held;
 
     LCD_Position(LCD_Addr, 0x0);     // Top left first character position
     LCD_Write(LCD_Addr, row, 16); // Write top row
