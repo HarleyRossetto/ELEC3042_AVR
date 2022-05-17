@@ -17,6 +17,7 @@
 #include "adc.h"
 #include "fsm.h"
 #include "period.h"
+#include "eeprom.h"
 
 /*
     Broadway                ->  BWY
@@ -69,6 +70,8 @@ TimerTask *tt_updateDisplay;
 TimerTask *tt_hazardCycle;
 TimerTask *tt_hazardCancel;
 TimerTask *tt_pedestrianFlash;
+
+TimerTask *tt_saveStateToEeprom;
 
 /**
  * Initialiser Prototypes
@@ -138,10 +141,13 @@ SystemState ss = SS_HAZARD;
  */
 uint8_t timer2InterruptCount = 0;
 
+EEPROMReadIntersectionData id;
 Initialiser initialise() {
     initialiseTimer2();
     initialiseTimer1();
     initialiseADC();
+
+    EEPROM_Initialise();
 
     setup_I2C();
     setup_LCD(LCD_Addr);
@@ -177,6 +183,13 @@ Initialiser initialise() {
     initialiseIntersectionStates();
 
     ADC_StartConversion();
+
+    id = EEPROM_ReadIntersectionData();
+    if (id.isValid) {
+        transitionTable.currentState = id.intersectionData.intersectionState;
+        state_after_red              = id.intersectionData.afterRedState;
+        state_before_amber              = id.intersectionData.beforeAmberState;
+    }
 }
 
 Initialiser initialiseMCP23S17() {
@@ -388,34 +401,12 @@ void chatterTone() {
     }
 }
 
-// void playChirpTask() {
-//     static uint8_t i = 0;
-//     OCR1A    = tones[i++];
-//     if (i >= 11) {
-//         i = 0;
-//         TCNT1 = 0;
-//         disableTimer(TC1);
-//         // TimerTaskDisable(tt_chirp);
-//     }
-// }
-
-// void chirpInit() {
-//     // TimerTaskReset(tt_chirp);
-//     // TimerTaskEnable(tt_chirp);
-//     enableTimer(TC1, TIMER1_CLOCK_SELECT_8_PRESCALER);
-// }
-
-// void playIdle() {
-//     static bool playing = false;
-//     if (playing) {
-//         disableTimer(TC1);
-//         TCNT1 = 0;
-//     }
-//     enableTimer(TC1, TIMER1_CLOCK_SELECT_8_PRESCALER);
-//     OCR1A = FREQ_TO_OCR(973);
-// }
-
 Action setUpdateDisplayFlag_ToAvoidCastErrors() { Flag_Set(&flag_UpdateDisplay); }
+
+Action saveStateToEeprom() {
+    IntersectionDataStruct ids = {transitionTable.currentState, state_before_amber, state_after_red};
+    EEPROM_SetIntersectionDataStruct(ids);
+}
 
 Initialiser initialiseTimerTasks() {
     tt_period        = TimerTaskCreate(PERIOD_MS, &ttPeriodElasped, NULL, true, false);
@@ -435,6 +426,9 @@ Initialiser initialiseTimerTasks() {
     tt_sound_descending = TimerTaskCreate(50L, descendingTone, NULL, false, false);
 
     tt_chatter = TimerTaskCreate(20L, chatterTone, NULL, false, false);
+
+    // Save state to eeprom every 15 seconds.
+    tt_saveStateToEeprom = TimerTaskCreate(1000L * 5, &saveStateToEeprom, NULL, true, false);
 }
 
 void enableTimers() {
@@ -503,7 +497,6 @@ void ttPeriodElasped() {
 
     // Handle held buttons
     handleHeldInputs();
-
 
     stateType = (transitionTable.currentState == BROADWAY_TURN_AND_PEDESTRIANS || transitionTable.currentState == BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN) ? 'P' : 'C';
     // Advance intersection state logic
@@ -710,37 +703,13 @@ Action actionUpdateStatusDisplay() {
     //     period_ms /= 10;
     // }
 
-    // uint16_t speakerValue = OCR1A;
-    // for (int i = 4; i >= 0; i--) {
-    //     row[10 + i] = (speakerValue % 10) + 48;
-    //     speakerValue /= 10;
-    // }
+    row[6] = id.intersectionData.intersectionState + 48;
+    row[8] = id.intersectionData.beforeAmberState + 48;
+    row[10] = id.intersectionData.afterRedState + 48;
 
-    // row[8] = 'E';
-    // row[9] = 48 + tt_sound_idle_start->enabled;
-    // row[11] = 'S';
-    // row[12] = 48 + tt_sound_idle_stop->enabled;
-
-    // row[14] = 48 + stopCalled;
-
-    // row[9] = state_change_time + 48;
-
-    // uint8_t chirp = chirpPeriodCount;
-    // for (int i = 4; i >= 0; i--) {
-    //     row[10 + i] = (chirp % 10) + 48;
-    //     chirp /= 10;
-    // }
-
-    // row[8]  = 48 + (transitionTable.currentState == BROADWAY_TURN_AND_PEDESTRIANS || transitionTable.currentState == BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN);
-    // row[10] = 48 + transitionTable.currentState;
-    // row[12] = stateType;
-
-    // row[11] = intersection_change_trigger_sensor.periods_held + 48;
+    row[14] = saveCount + 48;
 
     LCD_Position(LCD_Addr, 0x40);             // Bottom left first character position
-    //LCD_Write(LCD_Addr, &phaseStrings[phase], 3); // Write System Phase.
-    //LCD_Write(LCD_Addr, "Y ", 2);                  // Write phase color
-    //LCD_Write(LCD_Addr, &portAFlagsDisplay, 8);
     LCD_Write(LCD_Addr, row, 16); // Write top row
 }
 

@@ -47,6 +47,8 @@ set(SOURCES
         "src/${TARGET}/sensor.c"
         "src/${TARGET}/period.h"
         "src/${TARGET}/period.c"
+        "src/${TARGET}/eeprom.h"
+        "src/${TARGET}/eeprom.c"
         )
 
 ####################################################################################################

@@ -27,7 +27,8 @@
 			"trafficlight.h": "c",
 			"interrupt.h": "c",
 			"adc.h": "c",
-			"period.h": "c"
+			"period.h": "c",
+			"intersection.h": "c"
 		},
 		"editor.renderWhitespace": "none"
 	},
