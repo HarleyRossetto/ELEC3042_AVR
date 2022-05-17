@@ -27,6 +27,8 @@
 */
 const char phaseStrings[][3] = {"BWY", "BWS", "BTP", "LIT", "BWP", "amb", "red"};
 
+#define FREQ_TO_OCR(f) (F_CPU / (2 * f))
+
 typedef struct {
     uint8_t minTime : 4;
     uint8_t minTimeShoulder : 4;
@@ -73,6 +75,7 @@ TimerTask *tt_pedestrianFlash;
  */
 Initialiser initialise();
 Initialiser initialiseTimer2();
+Initialiser initialiseTimer1();
 Initialiser initialiseFlags();
 Initialiser initialiseMCP23S17();
 Initialiser initialiseTrafficLights();
@@ -164,7 +167,7 @@ Initialiser initialise() {
     PORTD |= (1 << PD3) | (1 << PD4) | (1 << PD7);
 
     // Broadway North Turn
-    DDRB |= (1 << DDB0) | (1 << DDB1);
+    DDRB |= (1 << DDB0);
 
     // 328p button interrupts
     PCMSK2 |= (1 << PCINT20) | (1 << PCINT23) | (1 << PCINT19); // S3, S5 & Hazard
@@ -219,11 +222,11 @@ Initialiser initialiseTimer2() {
 Initialiser initialiseTimer1() {
     disableTimer(TC1);
     // Timer/Counter Control Register A (Compare Output Modes and Waveform
-    TCCR1A = TC1_WGM_MODE_15_TCCR1A; // Waveform Generation Mode - Fast PWM, Mode 7
+    TCCR1A = (1 << COM1A0); // Waveform Generation Mode - Fast PWM, Mode 7
     //  Timer/Counter Control Register B (Input Capture Noise Canceler, Input
     //  Capture Edge Select, Waveform Generation Mode (bits 13 and 12), and Clock
     //  Select)
-    TCCR1B = TC1_WGM_MODE_15_TCCR1B;
+    TCCR1B = (1 << WGM12); //CTC Mode 4
 
     // Timer/Counter Control Register C (Force Output Compare)
     TCCR1C = 0x00;
@@ -232,10 +235,11 @@ Initialiser initialiseTimer1() {
     TCNT1 = 0;
 
     // Input Capture Register
-    ICR1 = 250000 / 277 - 1; //250000 = f_cpu / prescaler -> 16_000_000 / 64
+    //ICR1 = 250000 / 277 - 1; //250000 = f_cpu / prescaler -> 16_000_000 / 64
+    ICR1 = 0;
 
     // Output Compare Register A
-    OCR1A = ICR1 / 2; // Duty Cycle?
+    OCR1A = 0;
     // Output Compare Register B
     OCR1B = 0;
 
@@ -248,7 +252,8 @@ Initialiser initialiseTimer1() {
     TIFR1 = 0x00; // Ensure all timer interrupt flags are cleared.
 
     // Enable output on pin PB1/pin 9
-    DDRB |= (1 << PB1);
+    DDRB |= (1 << DDB1);
+    PORTB &= ~(1 << PORTB1);
 }
 
 Initialiser initialiseTrafficLights() {
@@ -313,6 +318,77 @@ void endHazardState() {
     transitionTable.currentState = BROADWAY; 
 }
 
+TimerTask *tt_sound_idle_stop;
+TimerTask *tt_sound_idle_start;
+
+void pedestrian_idle_start() {
+    enableTimer(TC1, TIMER1_CLOCK_SELECT_8_PRESCALER);
+    OCR1A = FREQ_TO_OCR(973);
+
+    TimerTaskRestart(tt_sound_idle_stop);
+}
+
+bool stopCalled = false;
+void pedestrian_idle_stop() {
+    disableTimer(TC1);
+    TCNT1 = 0;
+
+    stopCalled = !stopCalled;
+
+    //TimerTaskRestart(tt_sound_idle_start);
+}
+
+// void pedestrian_idle() {
+//     static bool running = false;
+//     if (running) {
+//         disableTimer(TC1);
+//         TCNT1 = 0;
+//         OCR1A = 0;
+//         running = false;
+//         // TimerTaskDisable(tt_sound_idle);
+//     } else {
+//         OCR1A               = FREQ_TO_OCR(973);
+//         enableTimer(TC1, TIMER1_CLOCK_SELECT_8_PRESCALER);
+//         running = true;
+//     }
+// }
+
+// void pedestrian_play_idle() {
+//     // TimerTaskReset(tt_sound_idle);
+//     // TimerTaskEnable(tt_sound_idle);
+// }
+
+// int tones[] = {
+//   3465, 2850, 2333, 1956, 1638, 1380, 1161, 992, 814, 704, 500
+// }; 
+
+// void playChirpTask() {
+//     static uint8_t i = 0;
+//     OCR1A    = tones[i++];
+//     if (i >= 11) {
+//         i = 0;
+//         TCNT1 = 0;
+//         disableTimer(TC1);
+//         // TimerTaskDisable(tt_chirp);
+//     }
+// }
+
+// void chirpInit() {
+//     // TimerTaskReset(tt_chirp);
+//     // TimerTaskEnable(tt_chirp);
+//     enableTimer(TC1, TIMER1_CLOCK_SELECT_8_PRESCALER);
+// }
+
+// void playIdle() {
+//     static bool playing = false;
+//     if (playing) {
+//         disableTimer(TC1);
+//         TCNT1 = 0;
+//     }
+//     enableTimer(TC1, TIMER1_CLOCK_SELECT_8_PRESCALER);
+//     OCR1A = FREQ_TO_OCR(973);
+// }
+
 Initialiser initialiseTimerTasks() {
     tt_period        = TimerTaskCreate(PERIOD_MS, &ttPeriodElasped, NULL, true, false);
     
@@ -325,12 +401,15 @@ Initialiser initialiseTimerTasks() {
     tt_hazardCancel  = TimerTaskCreate(10000L, &endHazardState, NULL, false, true);
 
     tt_pedestrianFlash = TimerTaskCreate(PERIOD_MS / 2, &flashPedestrianLight, NULL, false, false);
+
+    //tt_sound_idle_start = TimerTaskCreate(1800L, pedestrian_idle_start, NULL, true, true);
+    tt_sound_idle_stop = TimerTaskCreate(100L, pedestrian_idle_stop, NULL, false, true);
 }
 
 void enableTimers() {
     // Primary millisecond counter
     enableTimer(TC2, TIMER2_CLOCK_SELECT_64_PRESCALER);
-    enableTimer(TC1, TIMER1_CLOCK_SELECT_64_PRESCALER);
+    //enableTimer(TC1, TIMER1_CLOCK_SELECT_8_PRESCALER);
 }
 
 void updateTimers() {
@@ -359,7 +438,6 @@ void handleHeldInputs() {
 
 Sensor intersection_change_trigger_sensor;
 
-
 uint8_t getStatePeriodChangeTime() {
     const PhaseTimes STATE_PERIODS = phaseTimes[transitionTable.currentState];
 
@@ -370,8 +448,6 @@ uint8_t getStatePeriodChangeTime() {
     else 
         return intersection_change_trigger_sensor.periods_held; // Return held time
 }
-
-
 
 void flashPedestrianLight() {
     switch (transitionTable.currentState) {
@@ -387,7 +463,9 @@ void flashPedestrianLight() {
 }
 
 uint8_t state_change_time;
-void ttPeriodElasped() { 
+uint8_t chirpPeriodCount = 0;
+char stateType           = 'R';
+void ttPeriodElasped() {
     periodCounter++; 
     if (periodCounter > 99999)
         periodCounter = 0;
@@ -395,6 +473,8 @@ void ttPeriodElasped() {
     // Handle held buttons
     handleHeldInputs();
 
+
+    stateType = (transitionTable.currentState == BROADWAY_TURN_AND_PEDESTRIANS || transitionTable.currentState == BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN) ? 'P' : 'C';
     // Advance intersection state logic
     if (ss == SS_NORMAL) {
         state_change_time = getStatePeriodChangeTime();
@@ -415,6 +495,21 @@ void ttPeriodElasped() {
             Flag_Set(&flag_UpdateIntersection);
             if (tt_pedestrianFlash->enabled) {
                 TimerTaskDisable(tt_pedestrianFlash);
+            }
+        }
+
+        const bool isPedestrianState = (transitionTable.currentState == BROADWAY_TURN_AND_PEDESTRIANS || transitionTable.currentState == BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN);
+        if (isPedestrianState) {
+            pedestrian_idle_stop();
+        } else {
+            chirpPeriodCount++;
+
+            if (chirpPeriodCount % 5 == 0) {
+                pedestrian_idle_start();
+            }
+
+            if (chirpPeriodCount == 255) {// Roll over now to avoid 2 quick chirps
+                chirpPeriodCount = 0;
             }
         }
     }
@@ -466,6 +561,10 @@ int main(void) {
 
         TimerTaskSetPeriod(tt_period, PERIOD_MS);
         TimerTaskSetPeriod(tt_pedestrianFlash, PERIOD_MS / 2);
+
+        // Testing Speaker/Buzzer
+        //OCR1A = FREQ_TO_OCR(500);
+        //OCR1A = adc_value << 4;
     }
 
     return 0;
@@ -558,11 +657,11 @@ Action actionUpdateStatusDisplay() {
     }
 
     // Period Count
-    uint16_t currentPeriods = period_elasped_in_current_state;
-    for (int i = 1; i >= 0; i--) {
-        row[5 + i] = (currentPeriods % 10) + 48;
-        currentPeriods /= 10;
-    }
+    // uint16_t currentPeriods = period_elasped_in_current_state;
+    // for (int i = 1; i >= 0; i--) {
+    //     row[5 + i] = (currentPeriods % 10) + 48;
+    //     currentPeriods /= 10;
+    // }
 
     // ADC Period LUT Value
     // uint16_t period_ms = PERIOD_MS;
@@ -571,8 +670,30 @@ Action actionUpdateStatusDisplay() {
     //     period_ms /= 10;
     // }
 
+    // uint16_t speakerValue = OCR1A;
+    // for (int i = 4; i >= 0; i--) {
+    //     row[10 + i] = (speakerValue % 10) + 48;
+    //     speakerValue /= 10;
+    // }
+
+    // row[8] = 'E';
+    // row[9] = 48 + tt_sound_idle_start->enabled;
+    // row[11] = 'S';
+    // row[12] = 48 + tt_sound_idle_stop->enabled;
+
+    // row[14] = 48 + stopCalled;
 
     // row[9] = state_change_time + 48;
+
+    // uint8_t chirp = chirpPeriodCount;
+    // for (int i = 4; i >= 0; i--) {
+    //     row[10 + i] = (chirp % 10) + 48;
+    //     chirp /= 10;
+    // }
+
+    // row[8]  = 48 + (transitionTable.currentState == BROADWAY_TURN_AND_PEDESTRIANS || transitionTable.currentState == BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN);
+    // row[10] = 48 + transitionTable.currentState;
+    // row[12] = stateType;
 
     // row[11] = intersection_change_trigger_sensor.periods_held + 48;
 

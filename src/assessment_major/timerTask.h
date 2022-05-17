@@ -17,7 +17,7 @@
 #include "bool.h"
 #include "stdint.h"
 
-#define MAX_TIMERTASKS 24
+#define MAX_TIMERTASKS 30
 
 typedef void (*Callback)(void *arg);
 typedef void *CallbackArg;
@@ -65,6 +65,8 @@ void TimerTaskDisable(TimerTask *t);
  * @param t Task to reset, if null does nothing.
  */
 void TimerTaskReset(TimerTask *t);
+
+void TimerTaskRestart(TimerTask *t);
 
 /**
  * @brief Updates all timer tasks which are currently enabled.

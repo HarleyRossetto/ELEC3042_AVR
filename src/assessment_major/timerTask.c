@@ -58,6 +58,14 @@ inline void TimerTaskDisable(TimerTask *t) {
         t->enabled = false;
 }
 
+void TimerTaskRestart(TimerTask *t) {
+    // if (!t)
+    //     return;
+
+    t->elaspedTime = 0;
+    t->enabled     = true;
+}
+
 /**
  * @brief Resets the timer task elasped time. (i.e. sets elaspedTime to 0)
  * 
