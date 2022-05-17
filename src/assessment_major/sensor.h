@@ -7,9 +7,10 @@
 #define SENSOR_DEBOUNCE 10
 
 typedef struct {
-    uint32_t lastTime;
+    uint64_t lastTime;
     bool state;
     bool triggered;
+    uint8_t periods_held;
 } Sensor;
 
 #define PRESSED 1

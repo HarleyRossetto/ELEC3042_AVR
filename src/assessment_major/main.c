@@ -16,13 +16,8 @@
 #include "systemtimer.h"
 #include "adc.h"
 #include "fsm.h"
+#include "period.h"
 
-// ADC value to Period Time MS Lookup table.
-const uint16_t ADC_TO_PERIOD_TIME_MS_LUT[] = {80, 83, 87, 90, 94, 98, 101, 105, 108, 112, 116, 119, 123, 126, 130, 134, 137, 141, 144, 148, 152, 155, 159, 162, 166, 170, 173, 177, 181, 184, 188, 191, 195, 199, 202, 206, 209, 213, 217, 220, 224, 227, 231, 235, 238, 242, 245, 249, 253, 256, 260, 264, 267, 271, 274, 278, 282, 285, 289, 292, 296, 300, 303, 307, 310, 314, 318, 321, 325, 328, 332, 336, 339, 343, 346, 350, 354, 357, 361, 365, 368, 372, 375, 379, 383, 386, 390, 393, 397, 401, 404, 408, 411, 415, 419, 422, 426, 429, 433, 437, 440, 444, 448, 451, 455, 458, 462, 466, 469, 473, 476, 480, 484, 487, 491, 494, 498, 502, 505, 509, 512, 516, 520, 523, 527, 530, 534, 538, 541, 545, 549, 552, 556, 559, 563, 567, 570, 574, 577, 581, 585, 588, 592, 595, 599, 603, 606, 610, 613, 617, 621, 624, 628, 632, 635, 639, 642, 646, 650, 653, 657, 660, 664, 668, 671, 675, 678, 682, 686, 689, 693, 696, 700, 704, 707, 711, 714, 718, 722, 725, 729, 733, 736, 740, 743, 747, 751, 754, 758, 761, 765, 769, 772, 776, 779, 783, 787, 790, 794, 797, 801, 805, 808, 812, 816, 819, 823, 826, 830, 834, 837, 841, 844, 848, 852, 855, 859, 862, 866, 870, 873, 877, 880, 884, 888, 891, 895, 898, 902, 906, 909, 913, 917, 920, 924, 927, 931, 935, 938, 942, 945, 949, 953, 956, 960, 963, 967, 971, 974, 978, 981, 1000, 1000, 1000, 1000, 1000}; //985, 989, 992, 996, 1000};
-
-
-
-/// PROTOTYPES
 /*
     Broadway                ->  BWY
     Broadway South          ->  BWS
@@ -37,14 +32,19 @@ typedef struct {
     uint8_t minTimeShoulder : 4;
     uint8_t maxTime : 4;
     uint8_t maxTimeShoulder : 4;
+    uint8_t requestedHoldTime : 4;
 } PhaseTimes;
 
-const PhaseTimes phaseTimes[5] = {
-    (PhaseTimes){8, 0, 10, 0}, // Broadway
-    (PhaseTimes){2, 0, 4, 0}, // Broadway South
-    (PhaseTimes){7, 3, 7, 3},// Broadway  Turn & Pedestrians
-
+const PhaseTimes phaseTimes[] = {
+    (PhaseTimes){8, 0, 10, 0},   // Broadway
+    (PhaseTimes){2, 0,  4, 0},   // Broadway Southbound
+    (PhaseTimes){7, 3,  7, 3},   // Broadway Turn & Pedestrians
+    (PhaseTimes){3, 0,  5, 0},   // Little Street
+    (PhaseTimes){5, 3,  5, 3},   // Broadway Straight & little street pedestrians
+    (PhaseTimes){3, 0,  3, 0},   // Amber / Yellow Lights
+    (PhaseTimes){3, 0,  3, 0}    // Red Lights
 };
+uint8_t period_elasped_in_current_state = 0;
 
 extern volatile uint64_t totalMillisecondsElasped;
 
@@ -67,8 +67,6 @@ TimerTask *tt_period;
 TimerTask *tt_updateDisplay;
 TimerTask *tt_hazardCycle;
 TimerTask *tt_hazardCancel;
-TimerTask *tt_sampleAdc;
-/// ^^^^^ PROTOTYPES
 
 /**
  * Initialiser Prototypes
@@ -107,14 +105,13 @@ Flag flag_CheckExternalButtonInterrupts;
 Flag flag_CheckInternalButtonInterrupts;
 Flag flag_UpdateIntersection;
 
-Sensor sensor0 = {0, RELEASED};
-Sensor sensor1 = {0, RELEASED};
-Sensor sensor2 = {0, RELEASED};
-Sensor sensor3 = {0, RELEASED};
-Sensor sensor4 = {0, RELEASED};
-Sensor sensor5 = {0, RELEASED};
-Sensor sensor6 = {0, RELEASED};
-Sensor sensorHazard = {0, RELEASED};
+Sensor sensor0 = {0, RELEASED, RELEASED};
+Sensor sensor1 = {0, RELEASED, RELEASED};
+Sensor sensor2 = {0, RELEASED, RELEASED};
+Sensor sensor3 = {0, RELEASED, RELEASED};
+Sensor sensor4 = {0, RELEASED, RELEASED};
+Sensor sensor5 = {0, RELEASED, RELEASED};
+Sensor sensor6 = {0, RELEASED, RELEASED};
 
 char sensorStateChar(Sensor *b) { return b->triggered ? 'X' : 'O'; }
 
@@ -123,7 +120,7 @@ typedef enum { SS_HAZARD, SS_NORMAL } SystemState;
 #define IGNORE_HAZARD_STARTUP
 
 #ifdef IGNORE_HAZARD_STARTUP
-SystemState ss = SS_NORMAL; // SHOULD DEFAULT TO NORMAL
+SystemState ss = SS_NORMAL;
 #else
 SystemState ss = SS_HAZARD;
 #endif
@@ -199,6 +196,7 @@ Initialiser initialiseFlags() {
     flag_CheckExternalButtonInterrupts = Flag_Create(&actionCheckMcp23s17ButtonInterrupts, NULL);
     flag_CheckInternalButtonInterrupts = Flag_Create(&actionCheck328Buttons, NULL);
     flag_UpdateIntersection            = Flag_Create(&actionUpdateIntersection, NULL);
+    Flag_Set(&flag_UpdateIntersection);
 }
 
 // Millisecond timer
@@ -212,6 +210,45 @@ Initialiser initialiseTimer2() {
     OCR2B  = 0;
     TIMSK2 = (1 << OCIE2A);
     TIFR2  = 0x00;
+}
+
+// Speaker tone generator
+Initialiser initialiseTimer1() {
+    disableTimer(TC1);
+    // Timer/Counter Control Register A (Compare Output Modes and Waveform
+    // Generation Modes (bits 11 and 10))
+    TCCR1A = TC1_TCCR1A_CFG; // Waveform Generation Mode - PWM, Phase Correct Mode 11
+
+    // Timer starts once Clock Select is set, so we will configure that last.
+    //  Timer/Counter Control Register B (Input Capture Noise Canceler, Input
+    //  Capture Edge Select, Waveform Generation Mode (bits 13 and 12), and Clock
+    //  Select)
+    TCCR1B = (1 << WGM13) | (0 << WGM12);
+
+    // Timer/Counter Control Register C (Force Output Compare)
+    TCCR1C = 0x00;
+
+    // Timer/Counter Value
+    TCNT1 = 0;
+
+    // Output Compare Register A
+    OCR1A = 124;
+    // Output Compare Register B
+    OCR1B = 0;
+
+    // Input Capture Register
+    ICR1 = 0x0;
+
+    // Timer/Counter Interrupt Mask Register (Input Capture Interrupt Enable,
+    // Output Compare A/B Match Interrupt Enable, and Overflow Interrupt Enable)
+    TIMSK1 = 0;
+
+    // Timer/Counter Interrupt Flag Register (Input Capture, Output Compare A/B
+    // and Overflow Flags)
+    TIFR1 = 0x00; // Ensure all timer interrupt flags are cleared.
+
+    // Enable output on pin PB1/pin 9
+    DDRB |= (1 << PB1);
 }
 
 Initialiser initialiseTrafficLights() {
@@ -286,7 +323,6 @@ Initialiser initialiseTimerTasks() {
 
     tt_updateDisplay = TimerTaskCreate(100L, &Flag_Set, &flag_UpdateDisplay, true, false);
     tt_hazardCancel  = TimerTaskCreate(10000L, &endHazardState, NULL, false, true);
-    tt_sampleAdc     = TimerTaskCreate(250L, &ADC_StartConversion, NULL, true, false);
 }
 
 void enableTimers() {
@@ -299,13 +335,68 @@ void updateTimers() {
     timer2InterruptCount = 0;
 }
 
+void internalButtonHeldTime(Sensor *sensor) {
+    if (!sensor)
+        return;
+
+    if (sensor->state == PRESSED) {
+        sensor->periods_held++;
+    }
+}
+
+void handleHeldInputs() {
+    internalButtonHeldTime(&sensor0);
+    internalButtonHeldTime(&sensor1);
+    internalButtonHeldTime(&sensor2);
+    internalButtonHeldTime(&sensor3);
+    internalButtonHeldTime(&sensor4);
+    internalButtonHeldTime(&sensor5);
+    internalButtonHeldTime(&sensor6);
+}
+
+Sensor intersection_change_trigger_sensor;
+
+
+uint8_t getStatePeriodChangeTime() {
+    const PhaseTimes STATE_PERIODS = phaseTimes[transitionTable.currentState];
+
+    if (intersection_change_trigger_sensor.periods_held >= STATE_PERIODS.maxTime)
+        return STATE_PERIODS.maxTime;                           // Return maximum time
+    else if (intersection_change_trigger_sensor.periods_held < STATE_PERIODS.minTime)
+        return STATE_PERIODS.minTime;                           // Return minimum time
+    else 
+        return intersection_change_trigger_sensor.periods_held; // Return held time
+}
+
+uint8_t state_change_time;
+
 void ttPeriodElasped() { 
     periodCounter++; 
     if (periodCounter > 99999)
         periodCounter = 0;
 
-    if (ss == SS_NORMAL)
-        Flag_Set(&flag_UpdateIntersection);
+    // Handle held buttons
+    handleHeldInputs();
+
+    // Advance intersection state logic
+    if (ss == SS_NORMAL) {
+        state_change_time = getStatePeriodChangeTime();
+
+        // Broadway straight needs to not refresh/tick over, must keep counting periods until it is interrupted.
+        // if (transitionTable.currentState == BROADWAY) {
+        //     if (period_elasped_in_current_state >= state_change_time) {
+        //         Flag_Set(&flag_UpdateIntersection);
+        //         period_elasped_in_current_state = 0;
+        //     }    
+        // }
+
+        if (period_elasped_in_current_state >= state_change_time) {
+            Flag_Set(&flag_UpdateIntersection);
+            //
+        }
+    }
+
+    period_elasped_in_current_state++;
 }
 
 int main(void) {
@@ -350,28 +441,37 @@ int main(void) {
         // Check 328P Interrupts
         Flag_RunIfSet(&flag_CheckInternalButtonInterrupts);
 
-        TimerTaskSetPeriod(tt_period, ADC_TO_PERIOD_TIME_MS_LUT[adc_value]);
+        TimerTaskSetPeriod(tt_period, PERIOD_MS);
     }
 
     return 0;
 }
 
-uint8_t fsmSwitches = 0;
 Action actionUpdateIntersection() {
-    FSMUpdate(&transitionTable);
-    fsmSwitches++;
+    // Update the intersection FSM.
+    const FSMUpdateResult HAS_STATE_CHANGED = FSMUpdate(&transitionTable);
+
+    // If the state did chance, reset periods elasped in current state.
+    if (HAS_STATE_CHANGED == STATE_CHANGE)
+        period_elasped_in_current_state = 0;
 
     if (ss == SS_NORMAL) {
+        // References to current state and next intersection states (excluding amber and red)
         IntersectionLightState *currentIntersectionState = &intersectionStates[state_before_amber];
         IntersectionLightState *nextIntersectionState = &intersectionStates[state_after_red];
 
+        // If currently amber, mix states with yellow
         if (transitionTable.currentState == INTERSECTION_AMBER) {
             IntersectionLightState mixedState = mixIntersectionStates(currentIntersectionState, nextIntersectionState, YELLOW);
             applyIntersectionState(&mixedState);
-        } else if (transitionTable.currentState == INTERSECTION_RED) {
+        } 
+        // If currently red, mix states with red
+        else if (transitionTable.currentState == INTERSECTION_RED) {
             IntersectionLightState mixedState = mixIntersectionStates(currentIntersectionState, nextIntersectionState, RED);
             applyIntersectionState(&mixedState);
-        } else {
+        } 
+        // Otherwise just apply the current intersection state.
+        else {
             applyIntersectionState(&intersectionStates[transitionTable.currentState]);
         }
     }
@@ -401,6 +501,10 @@ Action actionUpdateStatusDisplay() {
         period /= 10;
     }
 
+    // Intersection change trigger sensor
+    row[8] = 'P';
+    row[9] = 48 + intersection_change_trigger_sensor.periods_held;
+
     LCD_Position(LCD_Addr, 0x0);     // Top left first character position
     LCD_Write(LCD_Addr, row, 16); // Write top row
 
@@ -429,11 +533,24 @@ Action actionUpdateStatusDisplay() {
         }
     }
 
-     uint16_t period_ms = ADC_TO_PERIOD_TIME_MS_LUT[adc_value];
-    for (int i = 3; i >= 0; i--) {
-        row[12 + i] = (period_ms % 10) + 48;
-        period_ms /= 10;
+    // Period Count
+    uint16_t currentPeriods = period_elasped_in_current_state;
+    for (int i = 1; i >= 0; i--) {
+        row[5 + i] = (currentPeriods % 10) + 48;
+        currentPeriods /= 10;
     }
+
+    // ADC Period LUT Value
+    // uint16_t period_ms = PERIOD_MS;
+    // for (int i = 3; i >= 0; i--) {
+    //     row[12 + i] = (period_ms % 10) + 48;
+    //     period_ms /= 10;
+    // }
+
+
+    // row[9] = state_change_time + 48;
+
+    // row[11] = intersection_change_trigger_sensor.periods_held + 48;
 
     LCD_Position(LCD_Addr, 0x40);             // Bottom left first character position
     //LCD_Write(LCD_Addr, &phaseStrings[phase], 3); // Write System Phase.
@@ -491,9 +608,7 @@ ISR(INT0_vect) {
 ISR(PCINT1_vect) { Flag_Set(&flag_CheckInternalButtonInterrupts); }
 
 // PCINT1 used for S3, s5 and hazard interrupts
-ISR(PCINT2_vect) { 
-    Flag_Set(&flag_CheckInternalButtonInterrupts); 
-}
+ISR(PCINT2_vect) { Flag_Set(&flag_CheckInternalButtonInterrupts); }
 
 // Main Counter - 1 ms resolution
 ISR(TIMER2_COMPA_vect) {

@@ -2,7 +2,7 @@
 
 IndentWidth: 4
 UseTab: Never
-ColumnLimit: 255
+ColumnLimit: 512
 BitFieldColonSpacing: Both
 
 AlignConsecutiveAssignments: Consecutive

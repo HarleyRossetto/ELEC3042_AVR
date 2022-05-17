@@ -33,6 +33,12 @@ bool trigger_bw_to_bw_south();
 bool trigger_bw_to_bw_right_and_ped();
 bool trigger_bw_to_little();
 bool trigger_bw_to_bw_and_little_ped();
+/** Actions */
+Action action_clear_triggers_bw_to_bw();
+Action action_clear_triggers_bw_to_bw_south();
+Action action_clear_triggers_bw_to_bw_right_and_ped();
+Action action_clear_triggers_bw_to_little();
+Action action_clear_triggers_bw_to_bw_and_little_ped();
 
 /**
  * Broadway Southbound State Triggers
@@ -41,6 +47,11 @@ bool trigger_bw_south_to_bw_right_and_ped();
 bool trigger_bw_south_to_little();
 bool trigger_bw_south_to_bw_and_little_ped();
 bool trigger_bw_south_to_bw();
+/** Actions */
+Action action_clear_triggers_bw_south_to_bw_right_and_ped();
+Action action_clear_triggers_bw_south_to_little();
+Action action_clear_triggers_bw_south_to_bw_and_little_ped();
+Action action_clear_triggers_bw_south_to_bw();
 
 /**
  * Broadway Right Turn & Pedestrian State Triggers
@@ -49,6 +60,10 @@ bool trigger_bw_right_and_ped_to_little();
 bool trigger_bw_right_and_ped_to_bw_and_little_ped();
 bool trigger_bw_right_and_ped_to_bw();
 bool trigger_bw_right_and_ped_to_bw_south();
+/** Actions */
+Action action_clear_triggers_bw_right_and_ped_to_little();
+Action action_clear_triggers_bw_right_and_ped_to_bw_and_little_ped();
+Action action_clear_triggers_bw_right_and_ped_to_bw_south();
 
 /**
  * Little Street State Triggers
@@ -57,12 +72,22 @@ bool trigger_little_to_bw_and_little_ped();
 bool trigger_little_to_bw();
 bool trigger_little_to_bw_south();
 bool trigger_little_to_bw_right_and_ped();
+/** Actions */
+Action action_clear_triggers_little_to_bw_and_little_ped();
+Action action_clear_triggers_little_to_bw_south();
+Action action_clear_triggers_little_to_bw_right_and_ped();
 
 /**
  * Broadway and Little Street Pedestrian State Triggers
  */
-bool trigger_bw_and_little_ped_to_bw();
 bool trigger_bw_and_little_ped_to_bw_south();
 bool trigger_bw_and_little_ped_to_bw_right_and_ped();
 bool trigger_bw_and_little_ped_to_little();
+/** Actions */
+Action action_clear_triggers_bw_and_little_ped_to_bw_south();
+Action action_clear_triggers_bw_and_little_ped_to_bw_right_and_ped();
+Action action_clear_triggers_bw_and_little_ped_to_little();
+
+// Broadway Action Clear straight lanes
+Action action_clear_triggers_bw();
 #endif // INTERSECTION_H

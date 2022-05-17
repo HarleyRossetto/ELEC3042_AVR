@@ -45,6 +45,8 @@ set(SOURCES
         "src/${TARGET}/intersection/intersection.c"
         "src/${TARGET}/sensor.h"
         "src/${TARGET}/sensor.c"
+        "src/${TARGET}/period.h"
+        "src/${TARGET}/period.c"
         )
 
 ####################################################################################################

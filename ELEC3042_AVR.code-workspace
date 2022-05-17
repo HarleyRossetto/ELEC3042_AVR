@@ -26,7 +26,8 @@
 			"iotypes.h": "c",
 			"trafficlight.h": "c",
 			"interrupt.h": "c",
-			"adc.h": "c"
+			"adc.h": "c",
+			"period.h": "c"
 		},
 		"editor.renderWhitespace": "none"
 	},

@@ -51,6 +51,8 @@ FSMUpdateResult FSMUpdate(FSM_TRANSITION_TABLE *table)
             {
                 transition.action();
 
+                const FSM_STATE initial = table->currentState;
+
                 // If the current state and next state is the same, bail out of here.
                 if (table->currentState == transition.nextState())
                     return;
@@ -61,19 +63,13 @@ FSMUpdateResult FSMUpdate(FSM_TRANSITION_TABLE *table)
                     state_after_red     = transition.nextState();
                     table->currentState = INTERSECTION_AMBER; // Force to amber
 
-                    // Clear sensors?
-                    Sensor_ClearTriggeredFlag(&sensor0);
-                    Sensor_ClearTriggeredFlag(&sensor1);
-                    Sensor_ClearTriggeredFlag(&sensor2);
-                    Sensor_ClearTriggeredFlag(&sensor3);
-                    Sensor_ClearTriggeredFlag(&sensor4);
-                    Sensor_ClearTriggeredFlag(&sensor5);
-                    Sensor_ClearTriggeredFlag(&sensor6);
                 } else {
                     table->currentState = transition.nextState();
                 }
 
-                updateResult = STATE_CHANGE;
+                if (initial != table->currentState)
+                    updateResult = STATE_CHANGE;
+                    
                 break;
             }
         }
