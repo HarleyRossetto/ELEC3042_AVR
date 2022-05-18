@@ -154,7 +154,6 @@ EEPROMReadIntersectionData EEPROM_ReadIntersectionData() {
     return (EEPROMReadIntersectionData){dataBuffer.intersectionDataStruct, dataBuffer.intersectionDataStruct.internal_checksum == eepromReadChecksum};
 }
 
-uint8_t saveCount = 0;
 /**
  * @brief Used to write the next byte from the eeprom state buffer. If a write is successful then bytes written
  * is incremented so that next time we will write the next. If the write is unsuccessful then this will allow us
@@ -179,6 +178,5 @@ void EEPROM_WriteNextByte() {
         TimerTaskDisable(timerTaskWriteNextByte);
     }
 
-            saveCount++;
     sei();
 }

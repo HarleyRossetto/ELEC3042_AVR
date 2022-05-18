@@ -4,7 +4,7 @@
 #include "bool.h"
 #include "iotypes.h"
 
-#define SENSOR_DEBOUNCE 10
+#define SENSOR_DEBOUNCE 5
 
 typedef struct {
     uint64_t lastTime;

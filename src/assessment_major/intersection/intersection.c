@@ -185,7 +185,7 @@ IntersectionLightState mixIntersectionStates(IntersectionLightState *from, Inter
  * Broadway State Triggers
  */
 bool trigger_bw_to_bw() { return !sensor1.triggered && !sensor2.triggered && !sensor5.triggered && !sensor6.triggered; }
-bool trigger_bw_to_bw_south() { return sensor1.triggered && !sensor5.triggered; }
+bool trigger_bw_to_bw_south() { return sensor1.triggered; }
 bool trigger_bw_to_bw_right_and_ped() { return sensor5.triggered; }
 bool trigger_bw_to_little() { return !sensor1.triggered && sensor2.triggered && !sensor5.triggered; }
 bool trigger_bw_to_bw_and_little_ped() { return !sensor1.triggered && !sensor2.triggered && !sensor5.triggered && sensor6.triggered; }

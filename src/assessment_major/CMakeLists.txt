@@ -20,8 +20,6 @@ set(SOURCES
         "src/${TARGET}/adc.c"
         "src/${TARGET}/bool.h"
         "src/${TARGET}/timers.h"
-        "src/${TARGET}/button.h"
-        "src/${TARGET}/button.c"
         "src/${TARGET}/systemtimer.h"
         "src/${TARGET}/systemtimer.c"
         "src/${TARGET}/timerTask.h"

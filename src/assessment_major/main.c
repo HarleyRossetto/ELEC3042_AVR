@@ -19,6 +19,16 @@
 #include "period.h"
 #include "eeprom.h"
 
+#define HAZARD_CYCLE_PERIOD 1000L
+#define DISPLAY_UPDATE_PERIOD 100L
+#define HAZARD_CANCEL_PERIOD 10000L
+#define SOUND_IDL_STOP_PERIOD 100L
+#define SOUND_DESCENDING_PERIOD 50L
+#define CHATTER_PERIOD 20L
+#define SAVE_TO_EEPROM_PERIOD 1000L * 15
+
+#define FREQ_TO_OCR(f) (F_CPU / (2 * f))
+
 bool startup = true;
 
 /*
@@ -29,8 +39,6 @@ bool startup = true;
     Broadway and Little Ped ->  BWP
 */
 const char phaseStrings[][3] = {"BWY", "BWS", "BTP", "LIT", "BWP", "amb", "red"};
-
-#define FREQ_TO_OCR(f) (F_CPU / (2 * f))
 
 typedef struct {
     uint8_t minTime : 4;
@@ -65,7 +73,10 @@ TrafficLight tl_Broadway_Pedestrian;
 TrafficLight tl_Little_Street_Pedestrian;
 TrafficLight tl_Little_Street;
 
-volatile uint16_t periodCounter = 0;
+ExternalLight NULL_EXTERNAL_LIGHT = {0, 0};
+InternalLight NULL_INTERNAL_LIGHT = {0, 0};
+
+volatile uint32_t periodCounter = 0;
 
 TimerTask *tt_period;
 TimerTask *tt_updateDisplay;
@@ -127,13 +138,7 @@ char sensorStateChar(Sensor *b) { return b->triggered ? 'X' : 'O'; }
 
 typedef enum { SS_HAZARD, SS_NORMAL } SystemState;
 
-#define IGNORE_HAZARD_STARTUP
-
-#ifdef IGNORE_HAZARD_STARTUP
-SystemState ss = SS_NORMAL;
-#else
-SystemState ss = SS_HAZARD;
-#endif
+SystemState system_state = SS_HAZARD;
 
 /*
     Keeps track of how many times the milliseconds timer/counter (TCC2) is triggered.
@@ -143,13 +148,24 @@ SystemState ss = SS_HAZARD;
  */
 uint8_t timer2InterruptCount = 0;
 
-EEPROMReadIntersectionData id;
 Initialiser initialise() {
+    EEPROM_Initialise();
+
+       // Hazard signal
+    if ((PIND & (1 << PIND3))) {
+        EEPROMReadIntersectionData id = EEPROM_ReadIntersectionData();
+        if (id.isValid) {
+            transitionTable.currentState = id.intersectionData.intersectionState;
+            state_after_red              = id.intersectionData.afterRedState;
+            state_before_amber              = id.intersectionData.beforeAmberState;
+            // period_elasped_in_current_state = id.intersectionData.timeInCurrentState; // This is unnecessary and leads to errors/danger.
+        }
+        system_state = SS_NORMAL;
+    }
+
     initialiseTimer2();
     initialiseTimer1();
     initialiseADC();
-
-    EEPROM_Initialise();
 
     setup_I2C();
     setup_LCD(LCD_Addr);
@@ -185,16 +201,6 @@ Initialiser initialise() {
     initialiseIntersectionStates();
 
     ADC_StartConversion();
-
-    if (!(PIND & (1 << PIND3))) {
-        id = EEPROM_ReadIntersectionData();
-        if (id.isValid) {
-            transitionTable.currentState = id.intersectionData.intersectionState;
-            state_after_red              = id.intersectionData.afterRedState;
-            state_before_amber              = id.intersectionData.beforeAmberState;
-            // period_elasped_in_current_state = id.intersectionData.timeInCurrentState; // This is unnecessary and leads to errors/danger.
-        }
-    }
 }
 
 Initialiser initialiseMCP23S17() {
@@ -216,6 +222,7 @@ Initialiser initialiseMCP23S17() {
 }
 
 Initialiser initialiseFlags() {
+    flag_UpdateTimers                  = Flag_Create(&updateTimers, NULL);
     flag_UpdateDisplay                 = Flag_Create(&actionUpdateStatusDisplay, NULL);
     flag_CheckExternalButtonInterrupts = Flag_Create(&actionCheckMcp23s17ButtonInterrupts, NULL);
     flag_CheckInternalButtonInterrupts = Flag_Create(&actionCheck328Buttons, NULL);
@@ -274,9 +281,6 @@ Initialiser initialiseTimer1() {
     PORTB &= ~(1 << PORTB1);
 }
 
-ExternalLight NULL_EXTERNAL_LIGHT = {0, 0};
-InternalLight NULL_INTERNAL_LIGHT = {0, 0};
-
 Initialiser initialiseTrafficLights() {
     tl_Broadway_North = (TrafficLight){
         (Light){External, (ExternalLight){MCP_PORT_B, GP5}, NULL_INTERNAL_LIGHT},
@@ -333,7 +337,8 @@ void hazardState() {
 }
 
 void endHazardState() {
-    ss = SS_NORMAL;
+    system_state = SS_NORMAL;
+    period_elasped_in_current_state = 0;
     TimerTaskDisable(tt_hazardCycle);
     //After we end hazard state return to BROADWAY intersection state.
     transitionTable.currentState = BROADWAY; 
@@ -353,26 +358,6 @@ void pedestrian_idle_stop() {
     TCNT1 = 0;
 }
 
-// void pedestrian_idle() {
-//     static bool running = false;
-//     if (running) {
-//         disableTimer(TC1);
-//         TCNT1 = 0;
-//         OCR1A = 0;
-//         running = false;
-//         // TimerTaskDisable(tt_sound_idle);
-//     } else {
-//         OCR1A               = FREQ_TO_OCR(973);
-//         enableTimer(TC1, TIMER1_CLOCK_SELECT_8_PRESCALER);
-//         running = true;
-//     }
-// }
-
-// void pedestrian_play_idle() {
-//     // TimerTaskReset(tt_sound_idle);
-//     // TimerTaskEnable(tt_sound_idle);
-// }
-
 int tones[] = {
   3465, 2850, 2333, 1956, 1638, 1380, 1161, 992, 814, 704, 500
 };
@@ -380,16 +365,18 @@ int tones[] = {
 TimerTask *tt_sound_descending;
 TimerTask *tt_chatter;
 
+uint8_t descendingToneAccessIndex = 1;
+
 void descendingTone() {
-    static uint8_t i = 11;
     enableTimer(TC1, TIMER1_CLOCK_SELECT_8_PRESCALER);
-    OCR1A    = tones[i--];
+    OCR1A    = tones[descendingToneAccessIndex--];
     // Just in case of some crazy freak rollover...
-    if (i == 0 || i >= 12) {
-        i = 11;
+    if (descendingToneAccessIndex == 0 || descendingToneAccessIndex >= 12) {
+        descendingToneAccessIndex = 11;
         TimerTaskDisable(tt_sound_descending);
-        TCNT1 = 0;
         disableTimer(TC1);
+        TCNT1 = 0;
+        OCR1A = 0;
         TimerTaskRestart(tt_chatter);
     }
 }
@@ -416,30 +403,29 @@ Action saveStateToEeprom() {
 Initialiser initialiseTimerTasks() {
     tt_period        = TimerTaskCreate(PERIOD_MS, &ttPeriodElasped, NULL, true, false);
     
-    tt_hazardCycle   = TimerTaskCreate(1000L, &hazardState, NULL, true, false);
-    #ifdef IGNORE_HAZARD_STARTUP
-        TimerTaskDisable(tt_hazardCycle);
-    #endif
+    tt_hazardCycle   = TimerTaskCreate(HAZARD_CYCLE_PERIOD, &hazardState, NULL, false, false);
+    if (system_state == SS_HAZARD) {
+        TimerTaskEnable(tt_hazardCycle);
+    }
+    tt_hazardCancel        = TimerTaskCreate(HAZARD_CANCEL_PERIOD, &endHazardState, NULL, false, true);
 
-    tt_updateDisplay       = TimerTaskCreate(100L, &setUpdateDisplayFlag_ToAvoidCastErrors, NULL, true, false);
-    tt_hazardCancel        = TimerTaskCreate(10000L, &endHazardState, NULL, false, true);
+    tt_updateDisplay       = TimerTaskCreate(DISPLAY_UPDATE_PERIOD, &setUpdateDisplayFlag_ToAvoidCastErrors, NULL, true, false);
 
     tt_pedestrianFlash = TimerTaskCreate(PERIOD_MS / 2, &flashPedestrianLight, NULL, false, false);
 
-    tt_sound_idle_stop = TimerTaskCreate(100L, pedestrian_idle_stop, NULL, false, true);
+    tt_sound_idle_stop = TimerTaskCreate(SOUND_IDL_STOP_PERIOD, pedestrian_idle_stop, NULL, false, true);
 
-    tt_sound_descending = TimerTaskCreate(50L, descendingTone, NULL, false, false);
+    tt_sound_descending = TimerTaskCreate(SOUND_DESCENDING_PERIOD, descendingTone, NULL, false, false);
 
-    tt_chatter = TimerTaskCreate(20L, chatterTone, NULL, false, false);
+    tt_chatter = TimerTaskCreate(CHATTER_PERIOD, chatterTone, NULL, false, false);
 
     // Save state to eeprom every 15 seconds.
-    tt_saveStateToEeprom = TimerTaskCreate(1000L * 15, &saveStateToEeprom, NULL, true, false);
+    tt_saveStateToEeprom = TimerTaskCreate(SAVE_TO_EEPROM_PERIOD, &saveStateToEeprom, NULL, true, false);
 }
 
 void enableTimers() {
     // Primary millisecond counter
     enableTimer(TC2, TIMER2_CLOCK_SELECT_64_PRESCALER);
-    //enableTimer(TC1, TIMER1_CLOCK_SELECT_8_PRESCALER);
 }
 
 void updateTimers() {
@@ -503,7 +489,7 @@ void ttPeriodElasped() {
     handleHeldInputs();
 
     // Advance intersection state logic
-    if (ss == SS_NORMAL) {
+    if (system_state == SS_NORMAL) {
         state_change_time = getStatePeriodChangeTime();
 
         const PhaseTimes STATE_PERIODS = phaseTimes[transitionTable.currentState];
@@ -520,16 +506,24 @@ void ttPeriodElasped() {
 
         // Pedestrian sounds
         const bool isPedestrianState = (transitionTable.currentState == BROADWAY_TURN_AND_PEDESTRIANS || transitionTable.currentState == BROADWAY_STRAIGHT_AND_LITTLE_STREET_PEDESTRIAN);
-        if (isPedestrianState) {
+        if (isPedestrianState && !tt_pedestrianFlash->enabled) {
             pedestrian_idle_stop();
             if (!tt_sound_descending->enabled) {
                 if (timerEnabled(TC1)) {
                     disableTimer(TC1);
+                    TimerTaskDisable(tt_sound_idle_stop);
+                    descendingToneAccessIndex = 11;
                 }
                 TimerTaskRestart(tt_sound_descending);
             }
         } else {
             chirpPeriodCount++;
+
+            if (tt_sound_descending->enabled) {
+                TimerTaskDisable(tt_sound_descending);
+                disableTimer(TC1);
+                TCNT1 = 0;
+            }
 
             if (chirpPeriodCount % 5 == 0) {
                 if (timerEnabled(TC1)) {
@@ -555,10 +549,29 @@ void ttPeriodElasped() {
     period_elasped_in_current_state++;
 }
 
+Action checkHazardState() {
+// Handles Hazard / Normal Operation States
+        // No hazard signal
+        if (PIND & (1 << PIND3)) {
+            if (!tt_hazardCancel->enabled && system_state == SS_HAZARD) {
+                TimerTaskReset(tt_hazardCancel);
+                TimerTaskEnable(tt_hazardCancel);
+            }
+
+            Flag_RunIfSet(&flag_UpdateIntersection);
+
+        } else { // Hazard signal active
+            if (system_state == SS_NORMAL) {
+                system_state = SS_HAZARD;
+                clearAllLights();
+                TimerTaskEnable(tt_hazardCycle);
+                TimerTaskDisable(tt_hazardCancel);
+            }
+        }
+}
+
 int main(void) {
     initialise();
-
-    flag_UpdateTimers = Flag_Create(&updateTimers, NULL);
 
     // Enable timers now that we have done the rest of our configuration.
     enableTimers();
@@ -567,24 +580,7 @@ int main(void) {
     sei();
 
     while (1) {
-        // Handles Hazard / Normal Operation States
-        // No hazard signal
-        if (PIND & (1 << PIND3)) {
-            if (!tt_hazardCancel->enabled && ss == SS_HAZARD) {
-                TimerTaskReset(tt_hazardCancel);
-                TimerTaskEnable(tt_hazardCancel);
-            }
-
-            Flag_RunIfSet(&flag_UpdateIntersection);
-
-        } else { // Hazard signal active
-            if (ss == SS_NORMAL) {
-                ss = SS_HAZARD;
-                clearAllLights();
-                TimerTaskEnable(tt_hazardCycle);
-                TimerTaskDisable(tt_hazardCancel);
-            }
-        }
+        checkHazardState();
 
         // Update timed tasks.
         Flag_RunIfSet(&flag_UpdateTimers);
@@ -599,10 +595,6 @@ int main(void) {
 
         TimerTaskSetPeriod(tt_period, PERIOD_MS);
         TimerTaskSetPeriod(tt_pedestrianFlash, PERIOD_MS / 2);
-
-        // Testing Speaker/Buzzer
-        //OCR1A = FREQ_TO_OCR(500);
-        //OCR1A = adc_value << 4;
     }
 
     return 0;
@@ -619,7 +611,7 @@ Action actionUpdateIntersection() {
     if (HAS_STATE_CHANGED == STATE_CHANGE)
         period_elasped_in_current_state = 0;
 
-    if (ss == SS_NORMAL) {
+    if (system_state == SS_NORMAL) {
         // References to current state and next intersection states (excluding amber and red)
         IntersectionLightState *currentIntersectionState = &intersectionStates[state_before_amber];
         IntersectionLightState *nextIntersectionState = &intersectionStates[state_after_red];
@@ -643,13 +635,6 @@ Action actionUpdateIntersection() {
     startup = false;
 }
 
-// Break these out into individual functions, then when a value is updated
-// we can just set the cursor accordingly and update said character, not
-// having to bother about the entire display, want to save as much time
-// as possible by avoid i2c transfers.
-//
-// Batch all the data into rows to limit i2c calls potentially?
-
 Action actionUpdateStatusDisplay() {
     // Row row initially all spaces.
     char row[16] = {0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20};
@@ -661,15 +646,11 @@ Action actionUpdateStatusDisplay() {
     row[5]       = sensorStateChar(&sensor5);
     row[6]       = sensorStateChar(&sensor6);
 
-    uint16_t period = periodCounter;
+    uint32_t period = periodCounter;
     for (int i = 4; i >= 0; i--) {
         row[11 + i] = (period % 10) + 48;
         period /= 10;
     }
-
-    // Intersection change trigger sensor
-    // row[8] = 'P';
-    // row[9] = 48 + intersection_change_trigger_sensor.periods_held;
 
     LCD_Position(LCD_Addr, 0x0);     // Top left first character position
     LCD_Write(LCD_Addr, row, 16); // Write top row
@@ -679,48 +660,47 @@ Action actionUpdateStatusDisplay() {
         row[i] = 0x20;
     }
 
-    if (ss == SS_HAZARD) {
+    if (system_state == SS_HAZARD) {
         row[0] = 'H';
         row[1] = 'A';
         row[2] = 'Z';
     } else {
+        // Phase string and main light color
         const char *phaseStr = phaseStrings[transitionTable.currentState];
         row[3] = 'G';
+        //If amber, then need to grab phrase string for state before amber, and set main light color to Y
         if (transitionTable.currentState == INTERSECTION_AMBER) {
             phaseStr = phaseStrings[state_before_amber];
             row[3]   = 'Y';
-        } else if (transitionTable.currentState == INTERSECTION_RED) {
+
+            // Also display the state we will go to after the following red state.
+            row[5] = '>';
+            const char *nextState = phaseStrings[state_after_red];
+            for (int i = 0; i <= 2; i++) {
+                row[7 + i] = nextState[i];
+            }
+        } 
+        //If red, then need to grab phrase string for state before amber, and set main light color to R
+        else if (transitionTable.currentState == INTERSECTION_RED) {
             phaseStr = phaseStrings[state_before_amber];
             row[3] = 'R';
+
+            // Also display the state we will go to after the following red state.
+            row[5] = '>';
+            const char *nextState = phaseStrings[state_after_red];
+            for (int i = 0; i <= 2; i++) {
+                row[7 + i] = nextState[i];
+            }
         }
 
+        // Buffer the phase string.
         for (int i = 0; i <= 2; i++) {
             row[i] = phaseStr[i];
         }
     }
 
-    // Period Count
-    // uint16_t currentPeriods = period_elasped_in_current_state;
-    // for (int i = 1; i >= 0; i--) {
-    //     row[5 + i] = (currentPeriods % 10) + 48;
-    //     currentPeriods /= 10;
-    // }
-
-    // ADC Period LUT Value
-    // uint16_t period_ms = PERIOD_MS;
-    // for (int i = 3; i >= 0; i--) {
-    //     row[12 + i] = (period_ms % 10) + 48;
-    //     period_ms /= 10;
-    // }
-
-    // row[6] = id.intersectionData.intersectionState + 48;
-    // row[8] = id.intersectionData.beforeAmberState + 48;
-    // row[10] = id.intersectionData.afterRedState + 48;
-
-    row[14] = saveCount + 48;
-
     LCD_Position(LCD_Addr, 0x40);             // Bottom left first character position
-    LCD_Write(LCD_Addr, row, 16); // Write top row
+    LCD_Write(LCD_Addr, row, 10); // Write top row
 }
 
 Action actionCheckMcp23s17ButtonInterrupts() {
@@ -771,7 +751,7 @@ ISR(INT0_vect) {
 // PCINT1 used for S6 interrupts
 ISR(PCINT1_vect) { Flag_Set(&flag_CheckInternalButtonInterrupts); }
 
-// PCINT1 used for S3, s5 and hazard interrupts
+// PCINT1 used for S3, s5 interrupts
 ISR(PCINT2_vect) { Flag_Set(&flag_CheckInternalButtonInterrupts); }
 
 // Main Counter - 1 ms resolution

@@ -18,8 +18,6 @@
 #include "intersection/intersection.h"
 #include "fsm.h"
 
-extern uint8_t saveCount;
-
 typedef struct  {
     FSM_STATE intersectionState;
     FSM_STATE beforeAmberState;
