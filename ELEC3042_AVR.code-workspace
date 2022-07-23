@@ -18,8 +18,19 @@
 			"io.h": "c",
 			"iom328p.h": "c",
 			"eeprom_data.h": "c",
-			"bool.h": "c"
-		}
+			"bool.h": "c",
+			"null.h": "c",
+			"types.h": "c",
+			"led.h": "c",
+			"mcp23s17.h": "c",
+			"iotypes.h": "c",
+			"trafficlight.h": "c",
+			"interrupt.h": "c",
+			"adc.h": "c",
+			"period.h": "c",
+			"intersection.h": "c"
+		},
+		"editor.renderWhitespace": "none"
 	},
 	"extensions": {
 		"recommendations": [

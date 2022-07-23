@@ -15,9 +15,7 @@
                 "showReuseMessage": true,
                 "clear": false
             },
-            "problemMatcher": [
-                
-            ]
+            "problemMatcher": []
         },
         {
             "label": "Detach USB from WSL",
@@ -31,9 +29,7 @@
                 "showReuseMessage": true,
                 "clear": false
             },
-            "problemMatcher": [
-                
-            ]
+            "problemMatcher": []
         },
         {
             "label": "Dissassemble",
@@ -61,7 +57,11 @@
                 "showReuseMessage": true,
                 "clear": true
             },
-            "problemMatcher": []
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ],
     "inputs": [
@@ -71,6 +71,7 @@
             "description": "Select executable",
             "options": [
                 "main",
+                "assessment_major",
                 "assessment_minor",
                 "week3",
                 "w4p1",
@@ -78,7 +79,7 @@
                 "w4p3",
                 "w5p1"
             ],
-            "default": "assessment_minor"
+            "default": "assessment_major"
         }
     ]
 }
